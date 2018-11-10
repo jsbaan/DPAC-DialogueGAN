@@ -14,7 +14,7 @@ class DailyDialogParser:
 
     def process_raw_dialog(self, raw_dialog):
         raw_utterances = raw_dialog.split('__eou__')
-        return [self.process_raw_utterance(raw_utterance) for raw_utterance in raw_utterances]
+        return [self.process_raw_utterance(raw_utterance) for raw_utterance in raw_utterances if not raw_utterance.isspace()]
 
     def process_raw_utterance(self, raw_utterance):
         raw_sentences = nltk.sent_tokenize(raw_utterance)
