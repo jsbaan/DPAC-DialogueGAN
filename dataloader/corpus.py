@@ -4,9 +4,6 @@ from daily_dialog_parser import DailyDialogParser
 class Corpus(object):
     PAD = '<pad>' # Padding token
     UNK = '<unk>' # Unknown token (Out of vocabulary)
-    SOS = '<s>' # Start of sentence token
-    EOS = '</s>' # End of sentence token
-    EOU = '</u>' # End of utterance token
 
     def __init__(self, path='daily_dialog/', parser=DailyDialogParser(), vocabulary_limit=None):
         self.train_corpus = parser.process_file(path + 'train.txt')
