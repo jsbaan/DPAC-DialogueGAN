@@ -1,5 +1,6 @@
 from collections import Counter
 from daily_dialog_parser import DailyDialogParser
+from dp_dataset import DPDataset
 
 class Corpus(object):
     PAD = '<pad>' # Padding token
@@ -48,16 +49,13 @@ class Corpus(object):
                     if token not in self.vocabulary:
                         corpus[d_i][u_i][t_i] = self.UNK
 
+    def utterance_to_ids(self, utterance):
+        utterance_ids = []
 
+        for token in utterance:
+            utterance_ids.append(self.token_ids.get(token, self.token_ids[self.UNK]))
 
-
-    def sentence_to_ids(self, sentence):
-        sentence_ids = []
-
-        for token in sentence:
-            sentence_ids.append(self.reversed_vocab.get(token, default=self.unk_id))
-
-        return sentence_ids
+        return utterance_ids
 
     def corpus_to_ids(self, data):
         data_ids = []
@@ -65,15 +63,21 @@ class Corpus(object):
         for dialog in data:
             dialog_ids = []
 
-            for sentence in dialog:
-                dialog_ids.append(self.sentence_to_ids(sentence))
+            for utterance in dialog:
+                dialog_ids.append(self.utterance_to_ids(utterance))
             data_ids.append(dialog_ids)
 
-        return results
+        return data_ids
 
-    def get_corpus_ids(self):
-        train_ids = self.corpus_to_ids(self.train_corpus)
-        validation_ids = self.corpus_to_ids(self.validation_corpus)
-        test_ids = self.corpus_to_ids(self.test_corpus)
+    def get_train_dataset(self, context_size=3):
+        return self.get_dataset(self.train_corpus, context_size)
 
-        return train_ids, validation_ids, test_ids
+    def get_validation_dataset(self, context_size=3):
+        return self.get_dataset(self.validation_corpus, context_size)
+
+    def get_test_dataset(self, context_size=3):
+        return self.get_dataset(self.test_corpus, context_size)
+
+    def get_dataset(self, corpus, context_size):
+        corpus_ids = self.corpus_to_ids(corpus)
+        return DPDataset(corpus_ids, context_size)
