@@ -1,11 +1,12 @@
 from torch.utils.data.dataset import Dataset
 
 class DPDataset(Dataset):
-    def __init__(self, corpus, context_size):
+    def __init__(self, corpus, dialogs, context_size):
+        self.corpus = corpus
+
         self.contexts = []
         self.replies = []
-
-        for dialog in corpus:
+        for dialog in dialogs:
             max_start_i = len(dialog) - context_size - 1
             for start_i in range(max_start_i):
                 context = []
