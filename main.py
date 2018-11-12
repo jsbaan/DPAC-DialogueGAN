@@ -1,3 +1,17 @@
+# TODO
+    # Strategies that improve response diversity (https://arxiv.org/pdf/1701.06547.pdf)
+        # 1) Instead of using
+        # the same learning rate for all examples, using a
+        # weighted learning rate that considers the average
+        # tf-idf score for tokens within the response. Such
+        # a strategy decreases the influence from dull and
+        # generic utterances
+        # 2) Penalizing word types (stop words
+        # excluded) that have already been generated. Such
+        # a strategy dramatically decreases the rate of repetitive
+        # responses such as no. no. no. no. no. or contradictory
+        # responses such as I don’t like oranges
+        # but i like oranges.
 from __future__ import print_function
 from math import ceil
 import numpy as np
