@@ -7,6 +7,7 @@ import pdb
 import torch
 import torch.optim as optim
 import torch.nn as nn
+from torch.nn.utils import clip_grad_norm_
 from torch.nn import functional as F
 
 import generator
@@ -35,6 +36,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     """
     Max Likelihood Pretraining for the generator
     """
+
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
@@ -53,6 +55,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
             # Backpropagate loss
             loss.backward()
+            clip_grad_norm_(gen.parameters(), 10)
             optimizer.step()
             total_loss += loss.data.item()
 
