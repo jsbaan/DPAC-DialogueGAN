@@ -69,7 +69,7 @@ class Generator(nn.Module):
 
             # Sample token for entire batch from predicted vocab distribution
             batch_token_sample = torch.multinomial(torch.exp(output), 1).view(-1).data
-            prob = output.gather(1, batch_token_sample.unsqueeze(1)).view(-1).data
+            prob = torch.exp(output).gather(1, batch_token_sample.unsqueeze(1)).view(-1).data
             samples_prob[:, t] = prob
             samples[:, t] = batch_token_sample
             output = autograd.Variable(batch_token_sample)
