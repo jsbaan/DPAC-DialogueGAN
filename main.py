@@ -77,12 +77,14 @@ def train_generator_PG(context, gen, gen_opt, dis):
     Training is done for one batch.
     """
 
-    reply = gen(context)
+    # Forward pass
+    reply = gen(context, _, 0)
+    print(reply)
     rewards = dis.batchClassify(context, reply)
+    
+    # Backward pass 
     gen_opt.zero_grad()
-
-    # FIX loss function
-    pg_loss = gen.batchPGLoss(inp, target, rewards)
+    pg_loss = gen.batchPGLoss(inp, target, rewards) # FIX
     pg_loss.backward()
     gen_opt.step()
 

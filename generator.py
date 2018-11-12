@@ -6,7 +6,7 @@ import numpy as np
 import pdb
 import math
 import torch.nn.init as init
-from EncoderDecoderAttn import Encoder, Decoder
+# from EncoderDecoderAttn import Encoder, Decoder
 import random
 
 class Generator(nn.Module):
