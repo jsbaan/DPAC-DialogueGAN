@@ -41,25 +41,31 @@ class Generator(nn.Module):
             output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
         return outputs
 
-    def sample(self, src, max_len):
+    def sample(self, context, max_len):
         """
         Samples the network using a batch of source input sequence. Passes these inputs
         through the decoder and instead of taking the top1 (like in forward), sample
         using the distribution over the vocabulary
 
+
         Inputs: dialogue context and maximum sample sequence length
         Outputs: samples
-        samples: num_samples x max_seq_length (a sampled sequence in each row)"""
+        samples: num_samples x max_seq_length (a sampled sequence in each row)
+
+        Inputs: dialogue context (and maximum sample sequence length
+        Outputs: samples
+            - samples: num_samples x max_seq_length (a sampled sequence in each row)"""
+
         # Initialize sample
-        batch_size = src.size(1)
+        batch_size = context.size(1)
         vocab_size = self.decoder.output_size
         samples = autograd.Variable(torch.zeros(batch_size,max_len)).to(self.device)
-
+        samples_prob = autograd.Variable(torch.zeros(batch_size, max_len)).to(self.device)
 
         # Run input through encoder
-        encoder_output, hidden = self.encoder(src)
+        encoder_output, hidden = self.encoder(context)
         hidden = hidden[:self.decoder.n_layers]
-        output = autograd.Variable(src.data[0, :])  # sos
+        output = autograd.Variable(context.data[0, :])  # sos
 
         # Pass through decoder and sample from resulting vocab distribution
         for t in range(1, max_len):
@@ -68,9 +74,11 @@ class Generator(nn.Module):
 
             # Sample token for entire batch from predicted vocab distribution
             batch_token_sample = torch.multinomial(torch.exp(output), 1).view(-1).data
+            prob = output.gather(1, batch_token_sample.unsqueeze(1)).view(-1).data
+            samples_prob[:, t] = prob
             samples[:, t] = batch_token_sample
             output = autograd.Variable(batch_token_sample)
-        return samples
+        return samples, samples_prob
 
     def sample_old(self, num_samples, max_seq_len, start_letter=0):
         """
