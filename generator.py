@@ -6,47 +6,39 @@ import numpy as np
 import pdb
 import math
 import torch.nn.init as init
-
+from EncoderDecoderAttn import Encoder, Decoder
+import random
 
 class Generator(nn.Module):
 
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, max_seq_len, gpu=False, oracle_init=False):
+    def __init__(self, vocab_size, hidden_size, embed_size, enc_n_layers=2, \
+        enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, device='cpu'):
         super(Generator, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.embedding_dim = embedding_dim
-        self.max_seq_len = max_seq_len
-        self.vocab_size = vocab_size
-        self.gpu = gpu
 
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru = nn.GRU(embedding_dim, hidden_dim)
-        self.gru2out = nn.Linear(hidden_dim, vocab_size)
+        encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout)
+        decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout)
 
-        # initialise oracle network with N(0,1)
-        # otherwise variance of initialisation is very small => high NLL for data sampled from the same model
-        if oracle_init:
-            for p in self.parameters():
-                init.normal(p, 0, 1)
+        self.device = device
+        self.encoder = encoder
+        self.decoder = decoder
 
-    def init_hidden(self, batch_size=1):
-        h = autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim))
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+        batch_size = src.size(1)
+        max_len = trg.size(0)
+        vocab_size = self.decoder.output_size
+        outputs = autograd.Variable(torch.zeros(max_len, batch_size, vocab_size)).to(self.device)
 
-        if self.gpu:
-            return h.cuda()
-        else:
-            return h
-
-    def forward(self, inp, hidden):
-        """
-        Embeds input and applies GRU one token at a time (seq_len = 1)
-        """
-        # input dim                                             # batch_size
-        emb = self.embeddings(inp)                              # batch_size x embedding_dim
-        emb = emb.view(1, -1, self.embedding_dim)               # 1 x batch_size x embedding_dim
-        out, hidden = self.gru(emb, hidden)                     # 1 x batch_size x hidden_dim (out)
-        out = self.gru2out(out.view(-1, self.hidden_dim))       # batch_size x vocab_size
-        out = F.log_softmax(out, dim=1)
-        return out, hidden
+        encoder_output, hidden = self.encoder(src)
+        hidden = hidden[:self.decoder.n_layers]
+        output = autograd.Variable(trg.data[0, :])  # sos
+        for t in range(1, max_len):
+            output, hidden, attn_weights = self.decoder(
+                    output, hidden, encoder_output)
+            outputs[t] = output
+            is_teacher = random.random() < teacher_forcing_ratio
+            top1 = output.data.max(1)[1]
+            output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
+        return outputs
 
     def sample(self, num_samples, start_letter=0):
         """
@@ -125,4 +117,3 @@ class Generator(nn.Module):
                 loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
 
         return loss/batch_size
-
