@@ -7,6 +7,7 @@ import pdb
 import torch
 import torch.optim as optim
 import torch.nn as nn
+from torch.nn import functional as F
 
 import generator
 import discriminator
@@ -19,7 +20,7 @@ import os
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 CUDA = False
 VOCAB_SIZE = 5000
-MAX_SEQ_LEN = 20
+MAX_SEQ_LEN = 60
 START_LETTER = 0
 BATCH_SIZE = 32
 MLE_TRAIN_EPOCHS = 100
@@ -44,30 +45,26 @@ def train_generator_MLE(gen, optimizer, data, epochs):
         sys.stdout.flush()
         total_loss = 0
 
-        for i in range(0, POS_NEG_SAMPLES, BATCH_SIZE):
-            inp, target = helpers.prepare_generator_batch(real_data_samples[i:i + BATCH_SIZE], start_letter=START_LETTER,
-                                                          gpu=CUDA)
+        for (i, (context, reply)) in enumerate(train_data_loader):
             optimizer.zero_grad()
-            loss = gen.batchNLLLoss(inp, target)
+            context = torch.tensor(context).permute(1,0)
+            reply = torch.tensor(reply).permute(1,0)
+            output = gen(context, reply)
+
+            # Compute loss
+            pred_dist = output[1:].view(-1, VOCAB_SIZE)
+            tgt_tokens = reply[1:].contiguous().view(-1)
+            loss = F.nll_loss(pred_dist, tgt_tokens)
+
+            # Backpropagate loss
             loss.backward()
             optimizer.step()
-
             total_loss += loss.data.item()
 
-            if (i / BATCH_SIZE) % ceil(
-                            ceil(POS_NEG_SAMPLES / float(BATCH_SIZE)) / 10.) == 0:  # roughly every 10% of an epoch
-                print('.', end='')
-                sys.stdout.flush()
-
-        # each loss in a batch is loss per sample
-        total_loss = total_loss / ceil(POS_NEG_SAMPLES / float(BATCH_SIZE)) / MAX_SEQ_LEN
-
-        # sample from generator and compute oracle NLL
-        oracle_loss = helpers.batchwise_oracle_nll(gen, oracle, POS_NEG_SAMPLES, BATCH_SIZE, MAX_SEQ_LEN,
-                                                   start_letter=START_LETTER, gpu=CUDA)
-
-        print(' average_train_NLL = %.4f, oracle_sample_NLL = %.4f' % (total_loss, oracle_loss))
-
+            # Print updates
+            if i % 50 == 0 and i != 0:
+                print('[Epoch {} batch {}] loss: {}'.format(total_loss//50))
+                total_loss = 0
 
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
@@ -80,8 +77,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     reply = gen(context, reply, teacher_forcing_ratio=0)
     print(reply.shape)
     rewards = dis.batchClassify(context, reply)
-    
-    # Backward pass 
+
+    # Backward pass
     gen_opt.zero_grad()
     pg_loss = gen.batchPGLoss(inp, target, rewards) # FIX
     pg_loss.backward()

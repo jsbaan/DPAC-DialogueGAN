@@ -1,13 +1,17 @@
 from collections import Counter
-from dataloader.daily_dialog_parser import DailyDialogParser
-from dataloader.dp_dataset import DPDataset
-from dataloader.dp_collator import DPCollator
+from .daily_dialog_parser import DailyDialogParser
+from .dp_dataset import DPDataset
+from .dp_collator import DPCollator
+import os
 
 class DPCorpus(object):
     PAD = '<pad>' # Padding token
     UNK = '<unk>' # Unknown token (Out of vocabulary)
 
-    def __init__(self, path='dataloader/daily_dialog/', parser=DailyDialogParser(), vocabulary_limit=None):
+    def __init__(self, path=None, parser=DailyDialogParser(), vocabulary_limit=None):
+        if path is None:
+            path = os.path.dirname(os.path.realpath(__file__)) + '/daily_dialog/'
+
         self.train_dialogs = parser.process_file(path + 'train.txt')
         self.validation_dialogs = parser.process_file(path + 'validation.txt')
         self.test_dialogs = parser.process_file(path + 'test.txt')

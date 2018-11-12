@@ -1,4 +1,5 @@
 from torch.utils.data.dataset import Dataset
+from torch import LongTensor
 
 class DPDataset(Dataset):
     def __init__(self, corpus, dialogs, context_size):
@@ -23,4 +24,4 @@ class DPDataset(Dataset):
         context = self.contexts[item]
         replies = self.replies[item]
 
-        return (context, replies)
+        return (LongTensor(context), LongTensor(replies))
