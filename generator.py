@@ -11,7 +11,7 @@ import random
 
 class Generator(nn.Module):
 
-    def __init__(self, vocab_size, hidden_size, embed_size, enc_n_layers=2, \
+    def __init__(self, vocab_size, hidden_size, embed_size, max_len, enc_n_layers=2, \
         enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, device='cpu'):
         super(Generator, self).__init__()
 
@@ -21,17 +21,18 @@ class Generator(nn.Module):
         self.device = device
         self.encoder = encoder
         self.decoder = decoder
+        self.max_len = max_len
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
         batch_size = src.size(1)
-        max_len = trg.size(0)
+        # max_len = trg.size(0)
         vocab_size = self.decoder.output_size
-        outputs = autograd.Variable(torch.zeros(max_len, batch_size, vocab_size)).to(self.device)
+        outputs = autograd.Variable(torch.zeros(self.max_len, batch_size, vocab_size)).to(self.device)
 
         encoder_output, hidden = self.encoder(src)
         hidden = hidden[:self.decoder.n_layers]
         output = autograd.Variable(trg.data[0, :])  # sos
-        for t in range(1, max_len):
+        for t in range(1, self.max_len):
             output, hidden, attn_weights = self.decoder(
                     output, hidden, encoder_output)
             outputs[t] = output
