@@ -25,16 +25,11 @@ START_LETTER = 0
 BATCH_SIZE = 32
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-POS_NEG_SAMPLES = 10000
 
 GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
-
-pretrained_gen_path = './gen_MLEtrain_EMBDIM32_HIDDENDIM32_VOCAB5000_MAXSEQLEN20.trc'
-pretrained_dis_path = './dis_pretrain_EMBDIM_64_HIDDENDIM64_VOCAB5000_MAXSEQLEN20.trc'
-
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     """
@@ -47,9 +42,9 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
         for (i, (context, reply)) in enumerate(train_data_loader):
             optimizer.zero_grad()
-            context = torch.tensor(context).permute(1,0)
-            reply = torch.tensor(reply).permute(1,0)
-            output = gen(context, reply)
+            context = context.permute(1,0)
+            reply = reply.permute(1,0)
+            output = gen.forward(context, reply)
 
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
@@ -143,14 +138,9 @@ if __name__ == '__main__':
         with open('dataset.pickle', 'rb') as handle:
             train_data_loader= pickle.load(handle)
 
-
-
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
     gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
-
-    # dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
-    # dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
     if CUDA:
         gen = gen.cuda()
@@ -159,7 +149,6 @@ if __name__ == '__main__':
     # OPTIONAL: Pretrain generator
     print('Starting Generator MLE Training...')
     train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
-    quit()
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
