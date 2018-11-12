@@ -2,7 +2,7 @@ from torch.utils.data.dataset import Dataset
 from torch import LongTensor
 
 class DPDataset(Dataset):
-    def __init__(self, corpus, dialogs, context_size):
+    def __init__(self, corpus, dialogs, context_size=3, min_reply_length=None, max_reply_length=None):
         self.corpus = corpus
 
         self.contexts = []
@@ -10,12 +10,15 @@ class DPDataset(Dataset):
         for dialog in dialogs:
             max_start_i = len(dialog) - context_size - 1
             for start_i in range(max_start_i):
+                reply = dialog[start_i + context_size + 1]
                 context = []
                 for i in range(start_i, start_i+context_size):
                     context.extend(dialog[i])
 
-                self.contexts.append(context)
-                self.replies.append(dialog[start_i + context_size + 1])
+                if (min_reply_length is None or len(reply) >= min_reply_length) and \
+                        (max_reply_length is None or len(reply) <= max_reply_length):
+                    self.contexts.append(context)
+                    self.replies.append(dialog[start_i + context_size + 1])
 
     def __len__(self):
         return len(self.contexts)
