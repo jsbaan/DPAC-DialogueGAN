@@ -12,6 +12,7 @@
         # responses such as no. no. no. no. no. or contradictory
         # responses such as I don’t like oranges
         # but i like oranges.
+
 from __future__ import print_function
 from math import ceil
 import numpy as np
@@ -35,7 +36,8 @@ import os
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 CUDA = False
 VOCAB_SIZE = 5000
-MAX_SEQ_LEN = 60
+MIN_SEQ_LEN = 5
+MAX_SEQ_LEN = 30
 START_LETTER = 0
 BATCH_SIZE = 32
 MLE_TRAIN_EPOCHS = 100
@@ -146,7 +148,8 @@ if __name__ == '__main__':
     if not os.path.isfile("dataset.pickle"):
         print("Saving the data set")
         corpus = DPCorpus(vocabulary_limit=5000)
-        train_dataset = corpus.get_train_dataset()
+        train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
+            max_reply_length=MAX_SEQ_LEN)
         train_data_loader = DPDataLoader(train_dataset)
         with open('dataset.pickle', 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
