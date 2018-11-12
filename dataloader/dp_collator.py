@@ -1,3 +1,5 @@
+from torch import LongTensor
+
 class DPCollator:
     def __init__(self, pad_token):
         self.pad_token = pad_token
@@ -16,6 +18,6 @@ class DPCollator:
         padded_data = []
         for row in data:
             padding = [self.pad_token] * (max_length-len(row))
-            padded_data.append(row + padding)
+            padded_data.append(list(row) + padding)
 
-        return padded_data
+        return LongTensor(padded_data)

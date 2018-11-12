@@ -13,8 +13,9 @@ class Discriminator(nn.Module):
         self.gpu = gpu
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=True, dropout=dropout)
-        self.gru2hidden = nn.Linear(2*2*hidden_dim, hidden_dim)
+        self.gru_context = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=True, dropout=dropout)
+        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=True, dropout=dropout)
+        self.gru2hidden = nn.Linear(2*2*2*hidden_dim, hidden_dim)
         self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, 1)
 
@@ -26,20 +27,29 @@ class Discriminator(nn.Module):
         else:
             return h
 
-    def forward(self, input, hidden):
-        # input dim                                                # batch_size x seq_len
-        emb = self.embeddings(input)                               # batch_size x seq_len x embedding_dim
-        emb = emb.permute(1, 0, 2)                                 # seq_len x batch_size x embedding_dim
-        _, hidden = self.gru(emb, hidden)                          # 4 x batch_size x hidden_dim
-        hidden = hidden.permute(1, 0, 2).contiguous()              # batch_size x 4 x hidden_dim
-        out = self.gru2hidden(hidden.view(-1, 4*self.hidden_dim))  # batch_size x 4*hidden_dim
+    def forward(self, context, response, hidden_context, hidden_response):
+        # input dim                                                         # batch_size x seq_len
+        emb_context = self.embeddings(context)                              # batch_size x seq_len x embedding_dim
+        emb_context = emb_context.permute(1, 0, 2)                          # seq_len x batch_size x embedding_dim
+        _, hidden_context = self.gru_context(emb_context, hidden_context)   # 4 x batch_size x hidden_dim
+        hidden_context = hidden_context.permute(1, 0, 2).contiguous()       # batch_size x 4 x hidden_dim
+
+        emb_response = self.embeddings(response)
+        emb_response = emb_response.permute(1, 0, 2)
+        _, hidden_response = self.gru_response(emb_response, hidden_response)
+        hidden_response = hidden_response.permute(1, 0, 2).contiguous()
+
+        # concatenate context with response
+        hidden = torch.cat((hidden_context, hidden_response), dim=2)
+
+        out = self.gru2hidden(hidden.view(-1, 2*4*self.hidden_dim))             # batch_size x 4*hidden_dim
         out = torch.tanh(out)
         out = self.dropout_linear(out)
-        out = self.hidden2out(out)                                 # batch_size x 1
+        out = self.hidden2out(out)                                          # batch_size x 1
         out = torch.sigmoid(out)
         return out
 
-    def batchClassify(self, inp):
+    def batchClassify(self, context, response):
         """
         Classifies a batch of sequences.
 
@@ -50,8 +60,9 @@ class Discriminator(nn.Module):
             - out: batch_size ([0,1] score)
         """
 
-        h = self.init_hidden(inp.size()[0])
-        out = self.forward(inp, h)
+        h_context = self.init_hidden(context.size()[0])
+        h_response = self.init_hidden(response.size()[0])
+        out = self.forward(context, response, h_context, h_response)
         return out.view(-1)
 
     def batchBCELoss(self, inp, target):
@@ -67,4 +78,5 @@ class Discriminator(nn.Module):
         h = self.init_hidden(inp.size()[0])
         out = self.forward(inp, h)
         return loss_fn(out, target)
+
 

@@ -1,5 +1,5 @@
 from torch.utils.data.dataloader import DataLoader
-from dataloader.dp_corpus import DPCorpus
+from .dp_corpus import DPCorpus
 
 class DPDataLoader(DataLoader):
     def __init__(self, dataset, batch_size=64):
