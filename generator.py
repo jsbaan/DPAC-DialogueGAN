@@ -55,10 +55,10 @@ class Generator(nn.Module):
         batch_size = context.size(1)
         vocab_size = self.decoder.output_size
         samples = autograd.Variable(torch.zeros(batch_size,max_len)).to(self.device)
-
+        samples_prob = autograd.Variable(torch.zeros(batch_size, max_len)).to(self.device)
 
         # Run input through encoder
-        encoder_output, hidden = self.encoder(src)
+        encoder_output, hidden = self.encoder(context)
         hidden = hidden[:self.decoder.n_layers]
         output = autograd.Variable(context.data[0, :])  # sos
 
@@ -69,9 +69,11 @@ class Generator(nn.Module):
 
             # Sample token for entire batch from predicted vocab distribution
             batch_token_sample = torch.multinomial(torch.exp(output), 1).view(-1).data
+            prob = output.gather(1, batch_token_sample.unsqueeze(1)).view(-1).data
+            samples_prob[:, t] = prob
             samples[:, t] = batch_token_sample
             output = autograd.Variable(batch_token_sample)
-        return samples
+        return samples, samples_prob
 
     def sample_old(self, num_samples, max_seq_len, start_letter=0):
         """
