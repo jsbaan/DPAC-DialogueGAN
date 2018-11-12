@@ -41,7 +41,39 @@ class Generator(nn.Module):
             output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
         return outputs
 
-    def sample(self, num_samples, start_letter=0):
+    def sample(self, src, max_len):
+    """
+    Samples the network using a batch of source input sequence. Passes these inputs
+    through the decoder and instead of taking the top1 (like in forward), sample
+    using the distribution over the vocabulary
+
+    Inputs: dialogue context and maximum sample sequence length
+    Outputs: samples
+        - samples: num_samples x max_seq_length (a sampled sequence in each row)
+    """
+        # Initialize sample
+        batch_size = src.size(1)
+        vocab_size = self.decoder.output_size
+        samples = autograd.Variable(torch.zeros(batch_size,max_len)).to(self.device)
+
+
+        # Run input through encoder
+        encoder_output, hidden = self.encoder(src)
+        hidden = hidden[:self.decoder.n_layers]
+        output = autograd.Variable(src.data[0, :])  # sos
+
+        # Pass through decoder and sample from resulting vocab distribution
+        for t in range(1, max_len):
+            output, hidden, attn_weights = self.decoder(
+                    output, hidden, encoder_output)
+
+            # Sample token for entire batch from predicted vocab distribution
+            batch_token_sample = torch.multinomial(torch.exp(output), 1).view(-1).data
+            samples[:, t] = batch_token_sample
+            output = autograd.Variable(batch_token_sample)
+        return samples
+
+    def sample_old(self, num_samples, max_seq_len, start_letter=0):
         """
         Samples the network and returns num_samples samples of length max_seq_len.
 
@@ -49,16 +81,16 @@ class Generator(nn.Module):
             - samples: num_samples x max_seq_length (a sampled sequence in each row)
         """
 
-        samples = torch.zeros(num_samples, self.max_seq_len).type(torch.LongTensor)
+        samples = torch.zeros(num_samples, max_seq_len).type(torch.LongTensor)
 
         h = self.init_hidden(num_samples)
         inp = autograd.Variable(torch.LongTensor([start_letter]*num_samples))
 
         if self.gpu:
-            samples = samples.cuda()
-            inp = inp.cuda()
+            samples = samples.to(self.device)
+            inp = inp.to(self.device)
 
-        for i in range(self.max_seq_len):
+        for i in range(max_seq_len):
             out, h = self.forward(inp, h)               # out: num_samples x vocab_size
             out = torch.multinomial(torch.exp(out), 1)  # num_samples x 1 (sampling from each row)
             samples[:, i] = out.view(-1).data

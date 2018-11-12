@@ -1,3 +1,18 @@
+# TODO
+    # Strategies that improve response diversity (https://arxiv.org/pdf/1701.06547.pdf)
+        # 1) Instead of using
+        # the same learning rate for all examples, using a
+        # weighted learning rate that considers the average
+        # tf-idf score for tokens within the response. Such
+        # a strategy decreases the influence from dull and
+        # generic utterances
+        # 2) Penalizing word types (stop words
+        # excluded) that have already been generated. Such
+        # a strategy dramatically decreases the rate of repetitive
+        # responses such as no. no. no. no. no. or contradictory
+        # responses such as I don’t like oranges
+        # but i like oranges.
+
 from __future__ import print_function
 from math import ceil
 import numpy as np
@@ -7,6 +22,7 @@ import pdb
 import torch
 import torch.optim as optim
 import torch.nn as nn
+from torch.nn.utils import clip_grad_norm_
 from torch.nn import functional as F
 
 import generator
@@ -20,26 +36,23 @@ import os
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 CUDA = False
 VOCAB_SIZE = 5000
-MAX_SEQ_LEN = 60
+MIN_SEQ_LEN = 5
+MAX_SEQ_LEN = 30
 START_LETTER = 0
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-POS_NEG_SAMPLES = 10000
 
 GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 
-pretrained_gen_path = './gen_MLEtrain_EMBDIM32_HIDDENDIM32_VOCAB5000_MAXSEQLEN20.trc'
-pretrained_dis_path = './dis_pretrain_EMBDIM_64_HIDDENDIM64_VOCAB5000_MAXSEQLEN20.trc'
-
-
 def train_generator_MLE(gen, optimizer, data, epochs):
     """
     Max Likelihood Pretraining for the generator
     """
+
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
@@ -47,9 +60,9 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
         for (i, (context, reply)) in enumerate(train_data_loader):
             optimizer.zero_grad()
-            context = torch.tensor(context).permute(1,0)
-            reply = torch.tensor(reply).permute(1,0)
-            output = gen(context, reply)
+            context = context.permute(1,0)
+            reply = reply.permute(1,0)
+            output = gen.forward(context, reply)
 
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
@@ -58,6 +71,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
             # Backpropagate loss
             loss.backward()
+            clip_grad_norm_(gen.parameters(), 10)
             optimizer.step()
             total_loss += loss.data.item()
 
@@ -120,8 +134,11 @@ if __name__ == '__main__':
     # Load data set
     if not os.path.isfile("dataset.pickle"):
         print("Saving the data set")
-        corpus = DPCorpus(vocabulary_limit=5000, batch_size=BATCH_SIZE)
-        train_dataset = corpus.get_train_dataset()
+
+
+        corpus = DPCorpus(vocabulary_limit=5000)
+        train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
+            max_reply_length=MAX_SEQ_LEN)
         train_data_loader = DPDataLoader(train_dataset)
         with open('dataset.pickle', 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -130,14 +147,14 @@ if __name__ == '__main__':
         with open('dataset.pickle', 'rb') as handle:
             train_data_loader= pickle.load(handle)
 
-
-
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
     gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
+
     dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
+
 
     if CUDA:
         gen = gen.cuda()
@@ -145,8 +162,7 @@ if __name__ == '__main__':
 
     # OPTIONAL: Pretrain generator
     print('Starting Generator MLE Training...')
-    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
-    # quit()
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
