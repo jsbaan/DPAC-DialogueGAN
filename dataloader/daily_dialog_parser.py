@@ -1,19 +1,9 @@
 import nltk
 
 class DailyDialogParser:
-    def __init__(self, path, sos, eos, eou):
-        self.path = path
-
-        self.sos = sos
-        self.eos = eos
-        self.eou = eou
-
-    def get_dialogs(self):
-        train_dialogs = self.process_file(self.path + 'train.txt')
-        validation_dialogs = self.process_file(self.path + 'validation.txt')
-        test_dialogs = self.process_file(self.path + 'test.txt')
-
-        return train_dialogs, validation_dialogs, test_dialogs
+    SOS = '<s>' # Start of sentence token
+    EOS = '</s>' # End of sentence token
+    EOU = '</u>' # End of utterance token
 
     def process_file(self, path):
         with open(path, 'r') as f:
@@ -33,9 +23,9 @@ class DailyDialogParser:
         for raw_sentence in raw_sentences:
             utterence.extend(self.process_raw_sentence(raw_sentence))
 
-        return utterence + [self.eou]
+        return utterence + [self.EOU]
 
     def process_raw_sentence(self, raw_sentence):
         raw_sentence = raw_sentence.lower()
         raw_sentence = raw_sentence.split()
-        return [self.sos] + raw_sentence + [self.eos]
+        return [self.SOS] + raw_sentence + [self.EOS]

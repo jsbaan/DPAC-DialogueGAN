@@ -2,7 +2,7 @@ from dp_corpus import DPCorpus
 from dp_data_loader import DPDataLoader
 
 corpus = DPCorpus(vocabulary_limit=5000)
-train_dataset = corpus.get_train_dataset(minimal_reply_length=5)
+train_dataset = corpus.get_train_dataset()
 train_data_loader = DPDataLoader(train_dataset)
 
 for (batch, (context, reply)) in enumerate(train_data_loader):

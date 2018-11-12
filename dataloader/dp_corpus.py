@@ -1,20 +1,16 @@
 from collections import Counter
-from daily_dialog_parser import DailyDialogParser
-from dp_dataset import DPDataset
-from dp_collator import DPCollator
+from dataloader.daily_dialog_parser import DailyDialogParser
+from dataloader.dp_dataset import DPDataset
+from dataloader.dp_collator import DPCollator
 
 class DPCorpus(object):
-    SOS = '<s>' # Start of sentence token
-    EOS = '</s>' # End of sentence token
-    EOU = '</u>' # End of utterance token
     PAD = '<pad>' # Padding token
     UNK = '<unk>' # Unknown token (Out of vocabulary)
 
-    def __init__(self, dialog_parser=None, vocabulary_limit=None):
-        if dialog_parser is None:
-            dialog_parser = DailyDialogParser('daily_dialog/', self.SOS, self.EOS, self.EOU)
-
-        self.train_dialogs, self.validation_dialogs, self.test_dialogs = dialog_parser.get_dialogs()
+    def __init__(self, path='dataloader/daily_dialog/', parser=DailyDialogParser(), vocabulary_limit=None):
+        self.train_dialogs = parser.process_file(path + 'train.txt')
+        self.validation_dialogs = parser.process_file(path + 'validation.txt')
+        self.test_dialogs = parser.process_file(path + 'test.txt')
 
         print('Building vocabulary')
         self.build_vocab(vocabulary_limit)
@@ -78,18 +74,18 @@ class DPCorpus(object):
         padding_id = self.token_ids[self.PAD]
         return [self.vocabulary[id] for id in ids if id is not padding_id]
 
-    def get_train_dataset(self, context_size=3, minimal_reply_length=None):
-        return self.get_dataset(self.train_dialogs, context_size, minimal_reply_length)
+    def get_train_dataset(self, context_size=3):
+        return self.get_dataset(self.train_dialogs, context_size)
 
-    def get_validation_dataset(self, context_size=3, minimal_reply_length=None):
-        return self.get_dataset(self.validation_dialogs, context_size, minimal_reply_length)
+    def get_validation_dataset(self, context_size=3):
+        return self.get_dataset(self.validation_dialogs, context_size)
 
-    def get_test_dataset(self, context_size=3, minimal_reply_length=None):
-        return self.get_dataset(self.test_dialogs, context_size, minimal_reply_length)
+    def get_test_dataset(self, context_size=3):
+        return self.get_dataset(self.test_dialogs, context_size)
 
-    def get_dataset(self, dialogs, context_size, minimal_reply_length):
+    def get_dataset(self, dialogs, context_size):
         dialogs_ids = self.dialogs_to_ids(dialogs)
-        return DPDataset(self, dialogs_ids, context_size, minimal_reply_length)
+        return DPDataset(self, dialogs_ids, context_size)
 
     def get_collator(self):
         return DPCollator(self.token_ids[self.PAD])
