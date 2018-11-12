@@ -16,7 +16,7 @@ from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
 
-
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 CUDA = False
 VOCAB_SIZE = 5000
 MAX_SEQ_LEN = 20
@@ -31,13 +31,11 @@ GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 
-oracle_samples_path = './oracle_samples.trc'
-oracle_state_dict_path = './oracle_EMBDIM32_HIDDENDIM32_VOCAB5000_MAXSEQLEN20.trc'
 pretrained_gen_path = './gen_MLEtrain_EMBDIM32_HIDDENDIM32_VOCAB5000_MAXSEQLEN20.trc'
 pretrained_dis_path = './dis_pretrain_EMBDIM_64_HIDDENDIM64_VOCAB5000_MAXSEQLEN20.trc'
 
 
-def train_generator_MLE(gen, gen_opt, oracle, real_data_samples, epochs):
+def train_generator_MLE(gen, optimizer, data, epochs):
     """
     Max Likelihood Pretraining for the generator
     """
@@ -49,10 +47,10 @@ def train_generator_MLE(gen, gen_opt, oracle, real_data_samples, epochs):
         for i in range(0, POS_NEG_SAMPLES, BATCH_SIZE):
             inp, target = helpers.prepare_generator_batch(real_data_samples[i:i + BATCH_SIZE], start_letter=START_LETTER,
                                                           gpu=CUDA)
-            gen_opt.zero_grad()
+            optimizer.zero_grad()
             loss = gen.batchNLLLoss(inp, target)
             loss.backward()
-            gen_opt.step()
+            optimizer.step()
 
             total_loss += loss.data.item()
 
@@ -133,8 +131,6 @@ def train_discriminator(discriminator, dis_opt, real_data_samples, generator, or
 
 # MAIN
 if __name__ == '__main__':
-
-
     # Load data set
     if not os.path.isfile("dataset.pickle"):
         print("Saving the data set")
@@ -143,7 +139,7 @@ if __name__ == '__main__':
         train_data_loader = DPDataLoader(train_dataset)
         with open('dataset.pickle', 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    else: 
+    else:
         print("Loading the data set")
         with open('dataset.pickle', 'rb') as handle:
             train_data_loader= pickle.load(handle)
@@ -151,20 +147,20 @@ if __name__ == '__main__':
 
 
     # Initalize Networks and optimizers
-    gen = generator.Generator(GEN_EMBEDDING_DIM, GEN_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
+    gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
     gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
-    dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
-    dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
+    # dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
+    # dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
     if CUDA:
         gen = gen.cuda()
         dis = dis.cuda()
- 
-    # # OPTIONAL: Pretrain generator 
-    # print('Starting Generator MLE Training...')
-    # train_generator_MLE(gen, gen_optimizer, oracle, oracle_samples, MLE_TRAIN_EPOCHS)
 
+    # OPTIONAL: Pretrain generator
+    print('Starting Generator MLE Training...')
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    quit()
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
