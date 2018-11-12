@@ -41,18 +41,18 @@ class Generator(nn.Module):
             output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
         return outputs
 
-    def sample(self, src, max_len):
-    """
-    Samples the network using a batch of source input sequence. Passes these inputs
-    through the decoder and instead of taking the top1 (like in forward), sample
-    using the distribution over the vocabulary
+    def sample(self, context, max_len):
+        """
+        Samples the network using a batch of source input sequence. Passes these inputs
+        through the decoder and instead of taking the top1 (like in forward), sample
+        using the distribution over the vocabulary
 
-    Inputs: dialogue context and maximum sample sequence length
-    Outputs: samples
-        - samples: num_samples x max_seq_length (a sampled sequence in each row)
-    """
+        Inputs: dialogue context (and maximum sample sequence length
+        Outputs: samples
+            - samples: num_samples x max_seq_length (a sampled sequence in each row)
+        """
         # Initialize sample
-        batch_size = src.size(1)
+        batch_size = context.size(1)
         vocab_size = self.decoder.output_size
         samples = autograd.Variable(torch.zeros(batch_size,max_len)).to(self.device)
 
@@ -60,7 +60,7 @@ class Generator(nn.Module):
         # Run input through encoder
         encoder_output, hidden = self.encoder(src)
         hidden = hidden[:self.decoder.n_layers]
-        output = autograd.Variable(src.data[0, :])  # sos
+        output = autograd.Variable(context.data[0, :])  # sos
 
         # Pass through decoder and sample from resulting vocab distribution
         for t in range(1, max_len):
