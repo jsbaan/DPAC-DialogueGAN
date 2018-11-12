@@ -115,3 +115,6 @@ dmypy.json
 
 # Intellij files
 .idea/
+
+# Mac files
+.DS_Store
