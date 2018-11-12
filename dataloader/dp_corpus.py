@@ -80,13 +80,13 @@ class DPCorpus(object):
         padding_id = self.token_ids[self.PAD]
         return [self.vocabulary[id] for id in ids if id != padding_id]
 
-    def get_train_dataset(self, context_size=3, min_reply_length=None, max_reply_length=None):
+    def get_train_dataset(self, context_size=2, min_reply_length=None, max_reply_length=None):
         return self.get_dataset(self.train_dialogs, context_size, min_reply_length, max_reply_length)
 
-    def get_validation_dataset(self, context_size=3, min_reply_length=None, max_reply_length=None):
+    def get_validation_dataset(self, context_size=2, min_reply_length=None, max_reply_length=None):
         return self.get_dataset(self.validation_dialogs, context_size, min_reply_length, max_reply_length)
 
-    def get_test_dataset(self, context_size=3, min_reply_length=None, max_reply_length=None):
+    def get_test_dataset(self, context_size=2, min_reply_length=None, max_reply_length=None):
         return self.get_dataset(self.test_dialogs, context_size, min_reply_length, max_reply_length)
 
     def get_dataset(self, dialogs, context_size, min_reply_length, max_reply_length):
