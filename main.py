@@ -22,7 +22,7 @@ CUDA = False
 VOCAB_SIZE = 5000
 MAX_SEQ_LEN = 60
 START_LETTER = 0
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
 POS_NEG_SAMPLES = 10000
@@ -73,14 +73,15 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
 
     # Forward pass
-
     reply = gen(context, reply, teacher_forcing_ratio=0)
+    _, reply = torch.max(reply, dim=2)
+    print(context.shape)
     print(reply.shape)
-    rewards = dis.batchClassify(context, reply)
+    rewards = dis.batchClassify(context, reply.permute(1,0))
 
     # Backward pass
     gen_opt.zero_grad()
-    pg_loss = gen.batchPGLoss(inp, target, rewards) # FIX
+    pg_loss = gen.batchPGLoss(context, reply, rewards) # FIX
     pg_loss.backward()
     gen_opt.step()
 
@@ -90,12 +91,17 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator):
     Training the discriminator on real_data_samples (positive) and generated samples from generator (negative).
     Samples are drawn d_steps times, and the discriminator is trained for epochs epochs.
     """
-    fake_reply = gen.samples(context)
+    # Batchsize is 32
+    # context is 32 x max_context_size
+
+    # fake_reply = gen.samples(context)
+    fake_reply = real_reply ## TEMPORARY FIX
     fake_targets = torch.zeros(BATCH_SIZE)
     real_targets = torch.ones(BATCH_SIZE)
-    replies = torch.cat((fake_reply, real_reply), 0)
-    targets = torch.cat((fake_targets, real_targets), 0)
 
+    replies = torch.cat((fake_reply, real_reply), 0) # 2x Batchsize
+    targets = torch.cat((fake_targets, real_targets), 0)
+    context = torch.cat((context, context), 0) # For fixing true and false data
     dis_opt.zero_grad()
     out = discriminator.batchClassify(context, replies)
     loss_fn = nn.BCELoss()
@@ -104,26 +110,17 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator):
     dis_opt.step()
 
     total_loss = loss.data.item()
-    total_acc = torch.sum((out>0.5)==(target>0.5)).data.item()
+    total_acc = torch.sum((out>0.5)==(targets>0.5)).data.item()/(2 * BATCH_SIZE)
 
-    if (i / BATCH_SIZE) % ceil(ceil(2 * POS_NEG_SAMPLES / float(
-            BATCH_SIZE)) / 10.) == 0:  # roughly every 10% of an epoch
-        print('.', end='')
-        sys.stdout.flush()
-
-    total_loss /= ceil(2 * POS_NEG_SAMPLES / float(BATCH_SIZE))
-    total_acc /= float(2 * POS_NEG_SAMPLES)
-
-    val_pred = discriminator.batchClassify(val_inp)
-    print(' average_loss = %.4f, train_acc = %.4f, val_acc = %.4f' % (
-        total_loss, total_acc, torch.sum((val_pred>0.5)==(val_target>0.5)).data.item()/200.))
+    print(' average_loss = %.4f, train_acc = %.4f' % (
+        total_loss, total_acc))
 
 # MAIN
 if __name__ == '__main__':
     # Load data set
     if not os.path.isfile("dataset.pickle"):
         print("Saving the data set")
-        corpus = DPCorpus(vocabulary_limit=5000)
+        corpus = DPCorpus(vocabulary_limit=5000, batch_size=BATCH_SIZE)
         train_dataset = corpus.get_train_dataset()
         train_data_loader = DPDataLoader(train_dataset)
         with open('dataset.pickle', 'wb') as handle:
@@ -156,7 +153,6 @@ if __name__ == '__main__':
     # train_discriminator(dis, dis_optimizer, oracle_samples, gen, oracle, 50, 3)
 
     # # ADVERSARIAL TRAINING
-    print(len(train_data_loader) * BATCH_SIZE)
     print('\nStarting Adversarial Training...')
 
     for epoch in range(ADV_TRAIN_EPOCHS):
@@ -164,13 +160,9 @@ if __name__ == '__main__':
         # TRAIN GENERATOR
         sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
-            context = torch.LongTensor(context)
-            reply = torch.LongTensor(reply)
-            print("Shape of reply", reply.shape)
-            print("Shape of context", context.shape)
 
             train_generator_PG(context, reply, gen, gen_optimizer, dis)
 
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
-            train_discriminator(context, reply, dis, dis_optimizer, gen)
+            # train_discriminator(context, reply, dis, dis_optimizer, gen)
