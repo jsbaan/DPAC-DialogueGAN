@@ -47,10 +47,15 @@ class Generator(nn.Module):
         through the decoder and instead of taking the top1 (like in forward), sample
         using the distribution over the vocabulary
 
+
+        Inputs: dialogue context and maximum sample sequence length
+        Outputs: samples
+        samples: num_samples x max_seq_length (a sampled sequence in each row)
+
         Inputs: dialogue context (and maximum sample sequence length
         Outputs: samples
-            - samples: num_samples x max_seq_length (a sampled sequence in each row)
-        """
+            - samples: num_samples x max_seq_length (a sampled sequence in each row)"""
+
         # Initialize sample
         batch_size = context.size(1)
         vocab_size = self.decoder.output_size
@@ -125,7 +130,7 @@ class Generator(nn.Module):
 
         return loss     # per batch
 
-    def batchPGLoss(self, inp, target, reward):
+    def batchPGLoss(self, inp, target, reward, word_probabilites):
         """
         Returns a pseudo-loss that gives corresponding policy gradients (on calling .backward()).
         Inspired by the example in http://karpathy.github.io/2016/05/31/rl/
@@ -139,16 +144,18 @@ class Generator(nn.Module):
             inp should be target with <s> (start letter) prepended
         """
 
-        batch_size, seq_len = inp.size()
-        inp = inp.permute(1, 0)          # seq_len x batch_size
-        target = target.permute(1, 0)    # seq_len x batch_size
-        h = self.init_hidden(batch_size)
-
+        batch_size, _ = inp.size()
         loss = 0
-        for i in range(seq_len):
-            out, h = self.forward(inp[i], h)
-            # TODO: should h be detached from graph (.detach())?
-            for j in range(batch_size):
-                loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
+
+        for batch in range(batch_size):
+            for word in range(batch):
+                loss += word_probabilites[batch][word] * reward[batch] # Montecarlo add reward per word (reward[batch][word])
+
+        # loss = 0
+        # for i in range(seq_len):
+        #     out, h = self.forward(inp[i], h)
+        #     # TODO: should h be detached from graph (.detach())?
+        #     for j in range(batch_size):
+        #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
 
         return loss/batch_size

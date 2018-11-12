@@ -49,10 +49,7 @@ DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 
 def train_generator_MLE(gen, optimizer, data, epochs):
-    """
-    Max Likelihood Pretraining for the generator
-    """
-
+    # Max Likelihood Pretraining for the generator
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
@@ -87,12 +84,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
 
     # Forward pass
-    reply = gen(context, reply, teacher_forcing_ratio=0)
-    _, reply = torch.max(reply, dim=2)
-    print(context.shape)
-    print(reply.shape)
-    rewards = dis.batchClassify(context, reply.permute(1,0))
-
+    reply = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    rewards = dis.batchClassify(context.long(), reply.long())
     # Backward pass
     gen_opt.zero_grad()
     pg_loss = gen.batchPGLoss(context, reply, rewards) # FIX
@@ -108,8 +101,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator):
     # Batchsize is 32
     # context is 32 x max_context_size
 
-    # fake_reply = gen.samples(context)
-    fake_reply = real_reply ## TEMPORARY FIX
+    fake_reply = gen.samples(context, MAX_SEQ_LEN)
     fake_targets = torch.zeros(BATCH_SIZE)
     real_targets = torch.ones(BATCH_SIZE)
 
@@ -162,7 +154,7 @@ if __name__ == '__main__':
 
     # OPTIONAL: Pretrain generator
     print('Starting Generator MLE Training...')
-    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
