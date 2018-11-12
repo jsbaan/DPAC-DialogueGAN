@@ -4,13 +4,17 @@ from dp_dataset import DPDataset
 from dp_collator import DPCollator
 
 class DPCorpus(object):
+    SOS = '<s>' # Start of sentence token
+    EOS = '</s>' # End of sentence token
+    EOU = '</u>' # End of utterance token
     PAD = '<pad>' # Padding token
     UNK = '<unk>' # Unknown token (Out of vocabulary)
 
-    def __init__(self, path='daily_dialog/', parser=DailyDialogParser(), vocabulary_limit=None):
-        self.train_dialogs = parser.process_file(path + 'train.txt')
-        self.validation_dialogs = parser.process_file(path + 'validation.txt')
-        self.test_dialogs = parser.process_file(path + 'test.txt')
+    def __init__(self, dialog_parser=None, vocabulary_limit=None):
+        if dialog_parser is None:
+            dialog_parser = DailyDialogParser('daily_dialog/', self.SOS, self.EOS, self.EOU)
+
+        self.train_dialogs, self.validation_dialogs, self.test_dialogs = dialog_parser.get_dialogs()
 
         print('Building vocabulary')
         self.build_vocab(vocabulary_limit)
