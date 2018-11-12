@@ -78,18 +78,18 @@ class DPCorpus(object):
         padding_id = self.token_ids[self.PAD]
         return [self.vocabulary[id] for id in ids if id is not padding_id]
 
-    def get_train_dataset(self, context_size=3):
-        return self.get_dataset(self.train_dialogs, context_size)
+    def get_train_dataset(self, context_size=3, minimal_reply_length=None):
+        return self.get_dataset(self.train_dialogs, context_size, minimal_reply_length)
 
-    def get_validation_dataset(self, context_size=3):
-        return self.get_dataset(self.validation_dialogs, context_size)
+    def get_validation_dataset(self, context_size=3, minimal_reply_length=None):
+        return self.get_dataset(self.validation_dialogs, context_size, minimal_reply_length)
 
-    def get_test_dataset(self, context_size=3):
-        return self.get_dataset(self.test_dialogs, context_size)
+    def get_test_dataset(self, context_size=3, minimal_reply_length=None):
+        return self.get_dataset(self.test_dialogs, context_size, minimal_reply_length)
 
-    def get_dataset(self, dialogs, context_size):
+    def get_dataset(self, dialogs, context_size, minimal_reply_length):
         dialogs_ids = self.dialogs_to_ids(dialogs)
-        return DPDataset(self, dialogs_ids, context_size)
+        return DPDataset(self, dialogs_ids, context_size, minimal_reply_length)
 
     def get_collator(self):
         return DPCollator(self.token_ids[self.PAD])
