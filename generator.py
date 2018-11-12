@@ -145,10 +145,11 @@ class Generator(nn.Module):
         """
 
         batch_size, _ = inp.size()
+        max_len = target.shape[1]
         loss = 0
 
         for batch in range(batch_size):
-            for word in range(batch):
+            for word in range(max_len):
                 loss += word_probabilites[batch][word] * reward[batch] # Montecarlo add reward per word (reward[batch][word])
 
         # loss = 0

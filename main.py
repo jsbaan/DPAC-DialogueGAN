@@ -84,11 +84,11 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
 
     # Forward pass
-    reply = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    reply, word_probabilities = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
     rewards = dis.batchClassify(context.long(), reply.long())
     # Backward pass
     gen_opt.zero_grad()
-    pg_loss = gen.batchPGLoss(context, reply, rewards) # FIX
+    pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities) # FIX
     pg_loss.backward()
     gen_opt.step()
 
