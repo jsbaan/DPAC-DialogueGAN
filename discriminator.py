@@ -29,6 +29,7 @@ class Discriminator(nn.Module):
 
     def forward(self, context, response, hidden_context, hidden_response):
         # input dim                                                         # batch_size x seq_len
+
         emb_context = self.embeddings(context)                              # batch_size x seq_len x embedding_dim
         emb_context = emb_context.permute(1, 0, 2)                          # seq_len x batch_size x embedding_dim
         _, hidden_context = self.gru_context(emb_context, hidden_context)   # 4 x batch_size x hidden_dim
