@@ -66,7 +66,9 @@ class Generator(nn.Module):
         encoder_output, hidden = self.encoder(context)
         hidden = hidden[:self.decoder.n_layers]
         output = autograd.Variable(context.data[0, :])  # sos
-
+        samples[:,0] = output
+        samples_prob[:,0] = torch.ones(output.size())
+        
         # Pass through decoder and sample from resulting vocab distribution
         for t in range(1, max_len):
             output, hidden, attn_weights = self.decoder(
