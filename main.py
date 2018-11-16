@@ -85,15 +85,19 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
 
     # Forward pass
     reply, word_probabilities = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    entropy = torch.mean(word_probabilities.log(), dim=1)
+    perplexity = torch.mean(2**(-entropy)).item()
+
     rewards = dis.batchClassify(context.long(), reply.long())
     # Backward pass
     gen_opt.zero_grad()
     pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities) # FIX
     pg_loss.backward()
     gen_opt.step()
+    return perplexity
 
 
-def train_discriminator(context, real_reply, discriminator, dis_opt, generator):
+def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
     """
     Training the discriminator on real_data_samples (positive) and generated samples from generator (negative).
     Samples are drawn d_steps times, and the discriminator is trained for epochs epochs.
@@ -101,23 +105,46 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator):
     # Batchsize is 32
     # context is 32 x max_context_size
 
-    fake_reply = gen.samples(context, MAX_SEQ_LEN)
+    fake_reply, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+
+    # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
+    
+    # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
+    # print("Fake generated reply")
+    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    # print("Real  reply")
+    # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+    # print(30 * "-")
+
     fake_targets = torch.zeros(BATCH_SIZE)
     real_targets = torch.ones(BATCH_SIZE)
 
-    replies = torch.cat((fake_reply, real_reply), 0) # 2x Batchsize
-    targets = torch.cat((fake_targets, real_targets), 0)
-    context = torch.cat((context, context), 0) # For fixing true and false data
+    # replies = torch.cat((fake_reply.long(), real_reply), 0) # 2x Batchsize
+    # targets = torch.cat((fake_targets, real_targets), 0)
+    # context = torch.cat((context, context), 0) # For fixing true and false data
+
     dis_opt.zero_grad()
-    out = discriminator.batchClassify(context, replies)
+    out_fake = discriminator.batchClassify(context, fake_reply.long())
+    out_real = discriminator.batchClassify(context, real_reply.long())
+
+
+
     loss_fn = nn.BCELoss()
-    loss = loss_fn(out, targets)
+    loss_fake = loss_fn(out_fake, fake_targets)
+
+    loss_real = loss_fn(out_real, real_targets)
+
+
+    loss = loss_real + loss_fake
     loss.backward()
     dis_opt.step()
 
     total_loss = loss.data.item()
-    total_acc = torch.sum((out>0.5)==(targets>0.5)).data.item()/(2 * BATCH_SIZE)
-
+    out = torch.cat((out_fake, out_real), 0)
+    targets = torch.cat((real_targets, fake_targets), 0)
+    correct_real = torch.sum(out_real > 0.5)/BATCH_SIZE
+    correct_fake = torch.sum(out_fake < 0.5)/BATCH_SIZE
+    total_acc = (correct_real + correct_fake)/2
     print(' average_loss = %.4f, train_acc = %.4f' % (
         total_loss, total_acc))
 
@@ -134,10 +161,12 @@ if __name__ == '__main__':
         train_data_loader = DPDataLoader(train_dataset)
         with open('dataset.pickle', 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            corpus = train_data_loader.dataset.corpus
     else:
         print("Loading the data set")
         with open('dataset.pickle', 'rb') as handle:
             train_data_loader= pickle.load(handle)
+        corpus = train_data_loader.dataset.corpus
 
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
@@ -168,9 +197,12 @@ if __name__ == '__main__':
         # TRAIN GENERATOR
         sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
-
-            train_generator_PG(context, reply, gen, gen_optimizer, dis)
+            print('\nAdversarial Training Generator: ')
+            perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
+            if batch % 10 == 0:
+                print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
-            # train_discriminator(context, reply, dis, dis_optimizer, gen)
+            train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+

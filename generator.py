@@ -146,13 +146,12 @@ class Generator(nn.Module):
             inp should be target with <s> (start letter) prepended
         """
 
-        batch_size, _ = inp.size()
-        max_len = target.shape[1]
+        batch_size, max_len = target.shape
         loss = 0
 
         for batch in range(batch_size):
             for word in range(max_len):
-                loss += word_probabilites[batch][word] * reward[batch] # Montecarlo add reward per word (reward[batch][word])
+                loss += word_probabilites[batch][word].log() * reward[batch] # Montecarlo add reward per word (reward[batch][word])
 
         # loss = 0
         # for i in range(seq_len):
@@ -160,5 +159,5 @@ class Generator(nn.Module):
         #     # TODO: should h be detached from graph (.detach())?
         #     for j in range(batch_size):
         #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
-
-        return loss/batch_size
+        loss = -torch.mean(loss)
+        return loss
