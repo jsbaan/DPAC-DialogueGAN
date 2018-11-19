@@ -1,34 +1,7 @@
 import torch
 from torch.autograd import Variable
 from math import ceil
-
-def prepare_generator_batch(samples, start_letter=0, gpu=False):
-    """
-    Takes samples (a batch) and returns
-
-    Inputs: samples, start_letter, cuda
-        - samples: batch_size x seq_len (Tensor with a sample in each row)
-
-    Returns: inp, target
-        - inp: batch_size x seq_len (same as target, but with start_letter prepended)
-        - target: batch_size x seq_len (Variable same as samples)
-    """
-
-    batch_size, seq_len = samples.size()
-
-    inp = torch.zeros(batch_size, seq_len)
-    target = samples
-    inp[:, 0] = start_letter
-    inp[:, 1:] = target[:, :seq_len-1]
-
-    inp = Variable(inp).type(torch.LongTensor)
-    target = Variable(target).type(torch.LongTensor)
-
-    if gpu:
-        inp = inp.cuda()
-        target = target.cuda()
-
-    return inp, target
+import sys
 
 
 def prepare_discriminator_data(pos_samples, neg_samples, gpu=False):
@@ -63,25 +36,15 @@ def prepare_discriminator_data(pos_samples, neg_samples, gpu=False):
     return inp, target
 
 
-def batchwise_sample(gen, num_samples, batch_size):
-    """
-    Sample num_samples samples batch_size samples at a time from gen.
-    Does not require gpu since gen.sample() takes care of that.
-    """
-
-    samples = []
-    for i in range(int(ceil(num_samples/float(batch_size)))):
-        samples.append(gen.sample(batch_size))
-
-    return torch.cat(samples, 0)[:num_samples]
 
 
-def batchwise_oracle_nll(gen, oracle, num_samples, batch_size, max_seq_len, start_letter=0, gpu=False):
-    s = batchwise_sample(gen, num_samples, batch_size)
-    oracle_nll = 0
-    for i in range(0, num_samples, batch_size):
-        inp, target = prepare_generator_batch(s[i:i+batch_size], start_letter, gpu)
-        oracle_loss = oracle.batchNLLLoss(inp, target) / max_seq_len
-        oracle_nll += oracle_loss.data.item()
+def monte_carlo(gen, dis, context, reply):
 
-    return oracle_nll/(num_samples/batch_size)
+    for idx, token in enumerate(reply):
+        seq = reply[:,0:idx]
+        print(seq)
+        if idx == 5:
+            sys.exit()
+
+
+    return rewards

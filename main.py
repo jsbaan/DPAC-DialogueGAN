@@ -27,13 +27,13 @@ from torch.nn import functional as F
 
 import generator
 import discriminator
-import helpers
+from helpers import *
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
 
-DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cpu')  #'cuda:0'
 CUDA = False
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
@@ -88,7 +88,13 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
-    rewards = dis.batchClassify(context.long(), reply.long())
+    MC = True
+    if MC:
+        #doing MC 
+        rewards = monte_carlo(gen, dis, context, reply)
+    else:
+        rewards = dis.batchClassify(context.long(), reply.long())
+
     # Backward pass
     gen_opt.zero_grad()
     pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities) # FIX
@@ -173,7 +179,7 @@ if __name__ == '__main__':
     gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
 
-    dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, gpu=CUDA)
+    dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
 
