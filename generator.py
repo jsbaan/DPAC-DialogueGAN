@@ -111,7 +111,7 @@ class Generator(nn.Module):
 
         return loss     # per batch
 
-    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0):
+    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0, MC_OR_LM = False):
         """
         Returns a pseudo-loss that gives corresponding policy gradients (on calling .backward()).
         Inspired by the example in http://karpathy.github.io/2016/05/31/rl/
@@ -130,8 +130,14 @@ class Generator(nn.Module):
         loss = 0
 
         for batch in range(batch_size):
-            for word in range(max_len):
-                loss += word_probabilites[batch][word].log() * reward[batch] # Montecarlo add reward per word (reward[batch][word])
+            for word in range(max_len - 1): # No end of sequence token
+                if MC_OR_LM:
+                    ### KLOPT NIET
+                    #  \pi(a|s) --> p(Word|State, CONTEXT)  Reward for word k --> CE(word|state)
+                    loss += word_probabilites[batch][word] * reward[batch][word] # LOG PROBALITIES ?? FIX
+                else:
+                    # Sentence level reward
+                    loss += word_probabilites[batch][word] * reward[batch] # LOG PROBALITIES ?? FIX
 
         # loss = 0
         # for i in range(seq_len):
@@ -139,7 +145,7 @@ class Generator(nn.Module):
         #     # TODO: should h be detached from graph (.detach())?
         #     for j in range(batch_size):
         #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
-        loss = -torch.mean(loss)
+        loss = - torch.mean(loss)
         if lamb > 0:
-            loss = loss -  lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
+            loss = loss - lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss

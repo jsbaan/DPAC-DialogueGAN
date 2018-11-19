@@ -43,8 +43,4 @@ def monte_carlo(gen, dis, context, reply):
     for idx, token in enumerate(reply):
         seq = reply[:,0:idx]
         print(seq)
-        if idx == 5:
-            sys.exit()
-
-
     return rewards
