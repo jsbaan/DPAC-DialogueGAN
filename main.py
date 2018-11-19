@@ -50,7 +50,7 @@ DIS_HIDDEN_DIM = 64
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
-    pad_token = data.data.corpus.token_to_id('<pad>')
+    pad_token = data.dataset.corpus.token_to_id('<pad>')
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
