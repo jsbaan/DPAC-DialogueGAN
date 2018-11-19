@@ -140,13 +140,6 @@ class Generator(nn.Module):
         #     for j in range(batch_size):
         #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
         loss = -torch.mean(loss)
-<<<<<<< HEAD
-        return loss
-=======
         if lamb > 0:
             loss = loss -  lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss
-
-
-
->>>>>>> 3e51794b6d6ed2abe0e59b375958679a645b6646
