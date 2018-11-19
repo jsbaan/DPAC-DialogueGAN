@@ -94,14 +94,15 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
 
     # Forward pass
-    reply, word_probabilities = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    reply, word_probabilities, hiddens = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
     MC = True
+    print("context ", context.shape)
+    print("reply ", reply.shape)
     if MC:
-        #doing MC 
-        rewards = monte_carlo(gen, dis, context, reply)
+        rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=5)
     else:
         rewards = dis.batchClassify(context.long(), reply.long())
 
@@ -121,7 +122,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # Batchsize is 32
     # context is 32 x max_context_size
 
-    fake_reply, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
 
@@ -198,8 +199,8 @@ if __name__ == '__main__':
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
-    print('Starting Generator MLE Training...')
-    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    # print('Starting Generator MLE Training...')
+    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')

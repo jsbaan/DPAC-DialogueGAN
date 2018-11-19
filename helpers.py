@@ -34,17 +34,3 @@ def prepare_discriminator_data(pos_samples, neg_samples, gpu=False):
         target = target.cuda()
 
     return inp, target
-
-
-
-
-def monte_carlo(gen, dis, context, reply):
-
-    for idx, token in enumerate(reply):
-        seq = reply[:,0:idx]
-        print(seq)
-        if idx == 5:
-            sys.exit()
-
-
-    return rewards
