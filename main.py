@@ -50,6 +50,7 @@ DIS_HIDDEN_DIM = 64
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
+    pad_token = data.data.corpus.token_to_id('<pad>')
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
@@ -66,7 +67,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
             tgt_tokens = reply[1:].contiguous().view(-1)
 
-            loss = F.nll_loss(pred_dist, tgt_tokens)
+            loss = F.nll_loss(pred_dist, tgt_tokens, ignore_index=pad_token)
 
             # Backpropagate loss
             loss.backward()
@@ -164,7 +165,7 @@ if __name__ == '__main__':
         print("Saving the data set")
 
 
-        corpus = DPCorpus(vocabulary_limit=5000)
+        corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
         train_data_loader = DPDataLoader(train_dataset)
@@ -200,7 +201,6 @@ if __name__ == '__main__':
 
     # # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
-    print(corpus.token_to_id('</u>'))
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         # TRAIN GENERATOR
