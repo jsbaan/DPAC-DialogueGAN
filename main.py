@@ -103,9 +103,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     perplexity = torch.mean(2**(-entropy)).item()
 
     if MC:
-        tic = time.time()
-        rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=5)
-        print(time.time() - tic)
+        rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=1)
     elif DISCRIMINATOR_LM:
         rewards = dis.get_rewards(reply)
     else:

@@ -136,7 +136,7 @@ class Generator(nn.Module):
                     output = autograd.Variable(batch_token_sample)
                 reward = dis.batchClassify(context.long(), samples.long())
                 rewards[t, i, :] = reward
-        reward_per_word = torch.mean(rewards, dim=1)
+        reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
         return reward_per_word
 
 
