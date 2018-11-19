@@ -33,6 +33,7 @@ from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
+import time
 
 DEVICE = torch.device('cpu')  #'cuda:0'
 CUDA = False
@@ -47,7 +48,7 @@ GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
-DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
+DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 
 def train_generator_MLE(gen, optimizer, data, epochs):
@@ -102,7 +103,9 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     perplexity = torch.mean(2**(-entropy)).item()
 
     if MC:
+        tic = time.time()
         rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=5)
+        print(time.time() - tic)
     elif DISCRIMINATOR_LM:
         rewards = dis.get_rewards(reply)
     else:
@@ -110,7 +113,11 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
 
     # Backward pass
     gen_opt.zero_grad()
-    pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities) # FIX
+    if MC or DISCRIMINATOR_LM == True:
+        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=True) # FIX
+    else: 
+        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=False) 
+
     pg_loss.backward()
     gen_opt.step()
     return perplexity

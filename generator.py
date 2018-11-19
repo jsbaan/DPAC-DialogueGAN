@@ -164,7 +164,7 @@ class Generator(nn.Module):
 
         return loss     # per batch
 
-    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0, MC_OR_LM = False):
+    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0, MC_LM=False):
         """
         Returns a pseudo-loss that gives corresponding policy gradients (on calling .backward()).
         Inspired by the example in http://karpathy.github.io/2016/05/31/rl/
@@ -184,7 +184,7 @@ class Generator(nn.Module):
 
         for batch in range(batch_size):
             for word in range(max_len - 1): # No end of sequence token
-                if MC_OR_LM:
+                if MC_LM:
                     ### KLOPT NIET
                     #  \pi(a|s) --> p(Word|State, CONTEXT)  Reward for word k --> CE(word|state)
                     loss += word_probabilites[batch][word] * reward[batch][word] # LOG PROBALITIES ?? FIX
