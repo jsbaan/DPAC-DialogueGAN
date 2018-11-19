@@ -27,7 +27,7 @@ class Generator(nn.Module):
         self.decoder = decoder
 
 
-    def forward(self, src, tgt, EOU, teacher_forcing_ratio=0.5):
+    def forward(self, src, tgt, teacher_forcing_ratio=0.5):
         batch_size = src.size(1)
         max_len = tgt.size(0)
         vocab_size = self.decoder.output_size
@@ -87,32 +87,6 @@ class Generator(nn.Module):
             output = autograd.Variable(batch_token_sample)
         return samples, samples_prob
 
-    def sample_old(self, num_samples, max_seq_len, start_letter=0):
-        """
-        Samples the network and returns num_samples samples of length max_seq_len.
-
-        Outputs: samples, hidden
-            - samples: num_samples x max_seq_length (a sampled sequence in each row)
-        """
-
-        samples = torch.zeros(num_samples, max_seq_len).type(torch.LongTensor)
-
-        h = self.init_hidden(num_samples)
-        inp = autograd.Variable(torch.LongTensor([start_letter]*num_samples))
-
-        if self.gpu:
-            samples = samples.to(self.device)
-            inp = inp.to(self.device)
-
-        for i in range(max_seq_len):
-            out, h = self.forward(inp, h)               # out: num_samples x vocab_size
-            out = torch.multinomial(torch.exp(out), 1)  # num_samples x 1 (sampling from each row)
-            samples[:, i] = out.view(-1).data
-
-            inp = out.view(-1)
-
-        return samples
-
     def batchNLLLoss(self, inp, target):
         """
         Returns the NLL Loss for predicting target sequence.
@@ -169,6 +143,3 @@ class Generator(nn.Module):
         if lamb > 0:
             loss = loss -  lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss
-
-
-
