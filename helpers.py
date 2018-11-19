@@ -34,3 +34,7 @@ def prepare_discriminator_data(pos_samples, neg_samples, gpu=False):
         target = target.cuda()
 
     return inp, target
+
+
+
+
