@@ -108,7 +108,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     fake_reply, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
-    
+
     # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
     # print("Fake generated reply")
     # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
@@ -191,7 +191,7 @@ if __name__ == '__main__':
 
     # # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
-
+    print(corpus.token_to_id('</u>'))
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         # TRAIN GENERATOR
