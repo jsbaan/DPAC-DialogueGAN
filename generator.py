@@ -1,3 +1,7 @@
+### TODO
+# Teacher forcing
+
+
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -23,22 +27,23 @@ class Generator(nn.Module):
         self.decoder = decoder
 
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+    def forward(self, src, tgt, EOU, teacher_forcing_ratio=0.5):
         batch_size = src.size(1)
-        max_len = trg.size(0)
+        max_len = tgt.size(0)
         vocab_size = self.decoder.output_size
         outputs = autograd.Variable(torch.zeros(max_len, batch_size, vocab_size)).to(self.device)
 
         encoder_output, hidden = self.encoder(src)
         hidden = hidden[:self.decoder.n_layers]
-        output = autograd.Variable(trg.data[0, :])  # sos
+        SOS = tgt.data[0, :]
+        output = autograd.Variable(SOS)
         for t in range(1, max_len):
             output, hidden, attn_weights = self.decoder(
                     output, hidden, encoder_output)
             outputs[t] = output
             is_teacher = random.random() < teacher_forcing_ratio
             top1 = output.data.max(1)[1]
-            output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
+            output = autograd.Variable(tgt.data[t] if is_teacher else top1).to(self.device)
         return outputs
 
     def sample(self, context, max_len):
@@ -68,7 +73,7 @@ class Generator(nn.Module):
         output = autograd.Variable(context.data[0, :])  # sos
         samples[:,0] = output
         samples_prob[:,0] = torch.ones(output.size())
-        
+
         # Pass through decoder and sample from resulting vocab distribution
         for t in range(1, max_len):
             output, hidden, attn_weights = self.decoder(
@@ -81,32 +86,6 @@ class Generator(nn.Module):
             samples[:, t] = batch_token_sample
             output = autograd.Variable(batch_token_sample)
         return samples, samples_prob
-
-    def sample_old(self, num_samples, max_seq_len, start_letter=0):
-        """
-        Samples the network and returns num_samples samples of length max_seq_len.
-
-        Outputs: samples, hidden
-            - samples: num_samples x max_seq_length (a sampled sequence in each row)
-        """
-
-        samples = torch.zeros(num_samples, max_seq_len).type(torch.LongTensor)
-
-        h = self.init_hidden(num_samples)
-        inp = autograd.Variable(torch.LongTensor([start_letter]*num_samples))
-
-        if self.gpu:
-            samples = samples.to(self.device)
-            inp = inp.to(self.device)
-
-        for i in range(max_seq_len):
-            out, h = self.forward(inp, h)               # out: num_samples x vocab_size
-            out = torch.multinomial(torch.exp(out), 1)  # num_samples x 1 (sampling from each row)
-            samples[:, i] = out.view(-1).data
-
-            inp = out.view(-1)
-
-        return samples
 
     def batchNLLLoss(self, inp, target):
         """
@@ -132,7 +111,7 @@ class Generator(nn.Module):
 
         return loss     # per batch
 
-    def batchPGLoss(self, inp, target, reward, word_probabilites):
+    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0):
         """
         Returns a pseudo-loss that gives corresponding policy gradients (on calling .backward()).
         Inspired by the example in http://karpathy.github.io/2016/05/31/rl/
@@ -142,6 +121,7 @@ class Generator(nn.Module):
             - target: batch_size x seq_len
             - reward: batch_size (discriminator reward for each sentence, applied to each token of the corresponding
                       sentence)
+            - Lambda: If causal-entropy lambda > 0
 
             inp should be target with <s> (start letter) prepended
         """
@@ -160,4 +140,6 @@ class Generator(nn.Module):
         #     for j in range(batch_size):
         #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
         loss = -torch.mean(loss)
+        if lamb > 0:
+            loss = loss -  lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss

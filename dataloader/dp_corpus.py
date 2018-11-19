@@ -42,6 +42,7 @@ class DPCorpus(object):
         self.vocabulary = special_tokens + [token for token, _ in vocabulary_counter]
         self.token_ids = {token: index for index, token in enumerate(self.vocabulary)}
 
+
     def flatten_dialogs(self, dialogs):
         all_words = []
         for dialog in dialogs:
@@ -79,6 +80,9 @@ class DPCorpus(object):
     def ids_to_tokens(self, ids):
         padding_id = self.token_ids[self.PAD]
         return [self.vocabulary[id] for id in ids if id != padding_id]
+
+    def token_to_id(self, token):
+        return self.token_ids[token]
 
     def get_train_dataset(self, context_size=2, min_reply_length=None, max_reply_length=None):
         return self.get_dataset(self.train_dialogs, context_size, min_reply_length, max_reply_length)

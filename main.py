@@ -40,7 +40,7 @@ MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 30
 START_LETTER = 0
 BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 100
+MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 50
 
 GEN_EMBEDDING_DIM = 32
@@ -50,12 +50,14 @@ DIS_HIDDEN_DIM = 64
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
+    pad_token = data.data.corpus.token_to_id('<pad>')
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
         total_loss = 0
-
+        losses = []
         for (i, (context, reply)) in enumerate(train_data_loader):
+            print('Epoch {} Iter {}'.format(epoch+1,i))
             optimizer.zero_grad()
             context = context.permute(1,0)
             reply = reply.permute(1,0)
@@ -64,18 +66,26 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
             tgt_tokens = reply[1:].contiguous().view(-1)
-            loss = F.nll_loss(pred_dist, tgt_tokens)
+
+            loss = F.nll_loss(pred_dist, tgt_tokens, ignore_index=pad_token)
 
             # Backpropagate loss
             loss.backward()
             clip_grad_norm_(gen.parameters(), 10)
             optimizer.step()
             total_loss += loss.data.item()
+            losses.append(loss)
 
             # Print updates
             if i % 50 == 0 and i != 0:
                 print('[Epoch {} batch {}] loss: {}'.format(total_loss//50))
                 total_loss = 0
+                torch.save({
+                    'epoch': epoch+1,
+                    'state_dict': gen.state_dict(),
+                    'optimizer' : optimizer.state_dict(),
+                    'loss'      : losses,
+                },'generator_checkpoint.pth.tar')
 
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
@@ -114,7 +124,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     fake_reply, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
-    
+
     # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
     # print("Fake generated reply")
     # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
@@ -161,7 +171,7 @@ if __name__ == '__main__':
         print("Saving the data set")
 
 
-        corpus = DPCorpus(vocabulary_limit=5000)
+        corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
         train_data_loader = DPDataLoader(train_dataset)
@@ -184,12 +194,12 @@ if __name__ == '__main__':
 
 
     if CUDA:
-        gen = gen.cuda()
         dis = dis.cuda()
 
     # OPTIONAL: Pretrain generator
+    # checkpoint = torch.load('generator_checkpoint.pth.tar')
     print('Starting Generator MLE Training...')
-    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
@@ -197,7 +207,6 @@ if __name__ == '__main__':
 
     # # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
-
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         # TRAIN GENERATOR
@@ -211,4 +220,3 @@ if __name__ == '__main__':
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-
