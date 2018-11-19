@@ -1,3 +1,7 @@
+### TODO
+# Teacher forcing
+
+
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -23,22 +27,23 @@ class Generator(nn.Module):
         self.decoder = decoder
 
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+    def forward(self, src, tgt, EOU, teacher_forcing_ratio=0.5):
         batch_size = src.size(1)
-        max_len = trg.size(0)
+        max_len = tgt.size(0)
         vocab_size = self.decoder.output_size
         outputs = autograd.Variable(torch.zeros(max_len, batch_size, vocab_size)).to(self.device)
 
         encoder_output, hidden = self.encoder(src)
         hidden = hidden[:self.decoder.n_layers]
-        output = autograd.Variable(trg.data[0, :])  # sos
+        SOS = tgt.data[0, :]
+        output = autograd.Variable(SOS)
         for t in range(1, max_len):
             output, hidden, attn_weights = self.decoder(
                     output, hidden, encoder_output)
             outputs[t] = output
             is_teacher = random.random() < teacher_forcing_ratio
             top1 = output.data.max(1)[1]
-            output = autograd.Variable(trg.data[t] if is_teacher else top1).to(self.device)
+            output = autograd.Variable(tgt.data[t] if is_teacher else top1).to(self.device)
         return outputs
 
     def sample(self, context, max_len):
@@ -68,7 +73,7 @@ class Generator(nn.Module):
         output = autograd.Variable(context.data[0, :])  # sos
         samples[:,0] = output
         samples_prob[:,0] = torch.ones(output.size())
-        
+
         # Pass through decoder and sample from resulting vocab distribution
         for t in range(1, max_len):
             output, hidden, attn_weights = self.decoder(
