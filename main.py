@@ -65,6 +65,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
             tgt_tokens = reply[1:].contiguous().view(-1)
+
             loss = F.nll_loss(pred_dist, tgt_tokens)
 
             # Backpropagate loss
@@ -84,7 +85,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                     'optimizer' : optimizer.state_dict(),
                     'loss'      : losses,
                 },'generator_checkpoint.pth.tar')
-                
+
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
@@ -186,7 +187,6 @@ if __name__ == '__main__':
 
 
     if CUDA:
-        gen = gen.cuda()
         dis = dis.cuda()
 
     # OPTIONAL: Pretrain generator
@@ -214,4 +214,3 @@ if __name__ == '__main__':
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-
