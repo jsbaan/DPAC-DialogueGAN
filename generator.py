@@ -27,7 +27,7 @@ class Generator(nn.Module):
         self.decoder = decoder
 
 
-    def forward(self, src, tgt, EOU, teacher_forcing_ratio=0.5):
+    def forward(self, src, tgt, teacher_forcing_ratio=0.5):
         batch_size = src.size(1)
         max_len = tgt.size(0)
         vocab_size = self.decoder.output_size
