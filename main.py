@@ -37,8 +37,7 @@ DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 CUDA = False
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
-MAX_SEQ_LEN = 30
-START_LETTER = 0
+MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 50
@@ -56,8 +55,8 @@ def train_generator_MLE(gen, optimizer, data, epochs):
         sys.stdout.flush()
         total_loss = 0
         losses = []
-        for (i, (context, reply)) in enumerate(train_data_loader):
-            print('Epoch {} Iter {}'.format(epoch+1,i))
+        for (iter, (context, reply)) in enumerate(train_data_loader):
+            print('Epoch {} Iter {}'.format(epoch+1,iter))
             optimizer.zero_grad()
             context = context.permute(1,0)
             reply = reply.permute(1,0)
@@ -77,8 +76,8 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             losses.append(loss)
 
             # Print updates
-            if i % 50 == 0 and i != 0:
-                print('[Epoch {} batch {}] loss: {}'.format(total_loss//50))
+            if iter % 50 == 0 and iter != 0:
+                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss//50))
                 total_loss = 0
                 torch.save({
                     'epoch': epoch+1,
@@ -86,6 +85,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                     'optimizer' : optimizer.state_dict(),
                     'loss'      : losses,
                 },'generator_checkpoint.pth.tar')
+    return losses
 
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
@@ -168,7 +168,7 @@ if __name__ == '__main__':
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
-        train_data_loader = DPDataLoader(train_dataset)
+        train_data_loader = DPDataLoader(train_dataset,batch_size=BATCH_SIZE)
         with open('dataset.pickle', 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
             corpus = train_data_loader.dataset.corpus
