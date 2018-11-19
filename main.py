@@ -40,7 +40,7 @@ MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 30
 START_LETTER = 0
 BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 100
+MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 50
 
 GEN_EMBEDDING_DIM = 32
@@ -54,8 +54,9 @@ def train_generator_MLE(gen, optimizer, data, epochs):
         print('epoch %d : ' % (epoch + 1), end='')
         sys.stdout.flush()
         total_loss = 0
-
+        losses = []
         for (i, (context, reply)) in enumerate(train_data_loader):
+            print('Epoch {} Iter {}'.format(epoch+1,i))
             optimizer.zero_grad()
             context = context.permute(1,0)
             reply = reply.permute(1,0)
@@ -71,12 +72,19 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             clip_grad_norm_(gen.parameters(), 10)
             optimizer.step()
             total_loss += loss.data.item()
+            losses.append(loss)
 
             # Print updates
             if i % 50 == 0 and i != 0:
                 print('[Epoch {} batch {}] loss: {}'.format(total_loss//50))
                 total_loss = 0
-
+                torch.save({
+                    'epoch': epoch+1,
+                    'state_dict': gen.state_dict(),
+                    'optimizer' : optimizer.state_dict(),
+                    'loss'      : losses,
+                },'generator_checkpoint.pth.tar')
+                
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
@@ -153,8 +161,9 @@ if __name__ == '__main__':
         dis = dis.cuda()
 
     # OPTIONAL: Pretrain generator
+    # checkpoint = torch.load('generator_checkpoint.pth.tar')
     print('Starting Generator MLE Training...')
-    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
