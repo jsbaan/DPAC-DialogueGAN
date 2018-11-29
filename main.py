@@ -140,7 +140,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # print(30 * "-")
     if DISCRIMINATOR_LM:
         print("Generated reply")
-        print(corpus.ids_to_tokens([int(i) for i in fake_reply.argmax(2)[:,0]]))
+        print(corpus.ids_to_tokens([int(i) for i in fake_reply[:,0]]))
         print("Real  reply")
         print(corpus.ids_to_tokens([int(i) for i in real_reply[:,0]]))
         fake_rewards = -torch.mean(dis.get_rewards(fake_reply), dim=1)
