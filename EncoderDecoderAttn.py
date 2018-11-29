@@ -10,13 +10,13 @@ import torch.nn.functional as F
 class Encoder(nn.Module):
     def __init__(self, input_size, embed_size, hidden_size, n_layers=1, dropout=0.5, device='cpu'):
         super(Encoder, self).__init__()
+        self.device = device
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.embed_size = embed_size
         self.embed = nn.Embedding(input_size, embed_size).to(self.device)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers,
                           dropout=dropout, bidirectional=True)
-        self.device = device
 
     def forward(self, src, hidden=None):
         embedded = self.embed(src)
@@ -30,12 +30,12 @@ class Encoder(nn.Module):
 class Attention(nn.Module):
     def __init__(self, hidden_size, device='cpu'):
         super(Attention, self).__init__()
+        self.device = device
         self.hidden_size = hidden_size
         self.attn = nn.Linear(self.hidden_size * 2, hidden_size)
         self.v = nn.Parameter(torch.rand(hidden_size))
         stdv = 1. / math.sqrt(self.v.size(0))
         self.v.data.uniform_(-stdv, stdv)
-        self.device = device
 
     def forward(self, hidden, encoder_outputs):
         timestep = encoder_outputs.size(0)
