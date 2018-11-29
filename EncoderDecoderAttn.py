@@ -13,7 +13,7 @@ class Encoder(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.embed_size = embed_size
-        self.embed = nn.Embedding(input_size, embed_size)
+        self.embed = nn.Embedding(input_size, embed_size).to(self.device)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers,
                           dropout=dropout, bidirectional=True)
         self.device = device
@@ -62,7 +62,7 @@ class Decoder(nn.Module):
         self.n_layers = n_layers
         self.device = device
 
-        self.embed = nn.Embedding(output_size, embed_size)
+        self.embed = nn.Embedding(output_size, embed_size).to(self.device)
         self.dropout = nn.Dropout(dropout, inplace=True)
         self.attention = Attention(hidden_size)
         self.gru = nn.GRU(hidden_size + embed_size, hidden_size,
