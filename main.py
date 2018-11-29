@@ -67,8 +67,8 @@ def train_generator_MLE(gen, optimizer, data, epochs):
         for (iter, (context, reply)) in enumerate(train_data_loader):
             print('Epoch {} Iter {}'.format(epoch+1,iter))
             optimizer.zero_grad()
-            context = context.permute(1,0)
-            reply = reply.permute(1,0)
+            context = context.permute(1,0).to(DEVICE)
+            reply = reply.permute(1,0).to(DEVICE)
             output = gen.forward(context, reply)
 
             # Compute loss
