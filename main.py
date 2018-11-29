@@ -12,6 +12,7 @@
         # responses such as no. no. no. no. no. or contradictory
         # responses such as I don’t like oranges
         # but i like oranges.
+    # Hierarchical decoder to generate multiple sentences
 
 from __future__ import print_function
 from math import ceil
@@ -119,8 +120,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     gen_opt.zero_grad()
     if MC or DISCRIMINATOR_LM == True:
         pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=True) # FIX
-    else: 
-        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=False) 
+    else:
+        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=False)
 
     pg_loss.backward()
     gen_opt.step()
@@ -175,7 +176,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     loss.backward()
     dis_opt.step()
 
-  
+
 
 # MAIN
 if __name__ == '__main__':
