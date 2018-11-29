@@ -141,8 +141,9 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     if DISCRIMINATOR_LM:
         fake_rewards = -torch.mean(dis.get_rewards(fake_reply), dim=1)
         real_rewards = -torch.mean(dis.get_rewards(real_reply), dim=1)
+        print("fake reward ", fake_rewards)
+        print("reak reward ", real_rewards)
         loss = -torch.mean((real_rewards - fake_rewards))
-        print("loss is ", loss)
     else:
         fake_targets = torch.zeros(BATCH_SIZE)
         real_targets = torch.ones(BATCH_SIZE)
