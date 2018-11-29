@@ -12,6 +12,7 @@
         # responses such as no. no. no. no. no. or contradictory
         # responses such as I don’t like oranges
         # but i like oranges.
+    # Hierarchical decoder to generate multiple sentences
 
 from __future__ import print_function
 from math import ceil
@@ -100,7 +101,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
 
     MC = True
     if MC:
-        #doing MC 
+        #doing MC
         rewards = monte_carlo(gen, dis, context, reply)
     else:
         rewards = dis.batchClassify(context.long(), reply.long())
