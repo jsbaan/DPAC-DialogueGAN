@@ -165,6 +165,7 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
         total_acc = (correct_real + correct_fake)/2
         print(' average_loss = %.4f, train_acc = %.4f' % (
             total_loss, total_acc))
+
     loss.backward()
     dis_opt.step()
 
@@ -198,10 +199,13 @@ if __name__ == '__main__':
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     else:
         dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
 
     dis = dis.to(DEVICE)
+    dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
+
+
+    
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
