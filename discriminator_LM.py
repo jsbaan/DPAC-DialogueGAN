@@ -76,7 +76,7 @@ class Discriminator(nn.Module):
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
             next_word = self.batchClassify(inp.long())
-            reward = criterion(next_word, target.long().to(self.device))
+            reward = criterion(next_word, target.long().to(self.device)).log
             rewards[:, t] = reward 
         return rewards
 
