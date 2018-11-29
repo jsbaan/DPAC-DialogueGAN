@@ -36,8 +36,7 @@ class Generator(nn.Module):
         SOS = tgt.data[0, :]
         output = autograd.Variable(SOS)
         for t in range(1, max_len):
-            output, hidden, attn_weights = self.decoder(
-                    output, hidden, encoder_output)
+            output, hidden, attn_weights = self.decoder(output, hidden, encoder_output)
             outputs[t] = output
             is_teacher = random.random() < teacher_forcing_ratio
             top1 = output.data.max(1)[1]
