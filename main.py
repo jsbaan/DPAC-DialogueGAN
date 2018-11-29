@@ -40,7 +40,6 @@ if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
-CUDA = False
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
@@ -200,17 +199,17 @@ if __name__ == '__main__':
 
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     else:
         dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
+    dis = dis.to(DEVICE)
+    gen = gen.to(DEVICE)
 
-    if CUDA:
-        dis = dis.cuda()
+    dis_optimizer = optim.Adagrad(dis.parameters())  ## ADAGRAD ??
+    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
