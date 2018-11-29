@@ -54,7 +54,7 @@ DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 
-def train_generator_MLE(gen, optimizer, data, epochs):
+def train_generator_MLE(gen, optimizer, data, epochs, corpus):
     # Max Likelihood Pretraining for the generator
     pad_token = data.dataset.corpus.token_to_id('<pad>')
     loss_per_epoch = []
@@ -64,7 +64,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
         total_loss = 0
         losses = []
         for (iter, (context, reply)) in enumerate(train_data_loader):
-            print('Epoch {} Iter {}'.format(epoch+1,iter))
+            # print('Epoch {} Iter {}'.format(epoch+1,iter))
             optimizer.zero_grad()
             context = context.permute(1,0).to(DEVICE)
             reply = reply.permute(1,0).to(DEVICE)
@@ -85,7 +85,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
             # Print updates
             if iter % 50 == 0 and iter != 0:
-                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss//50))
+                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
                     'epoch': epoch+1,
@@ -93,6 +93,12 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                     'optimizer' : optimizer.state_dict(),
                     'loss'      : losses,
                 },'generator_checkpoint{}.pth.tar'.format(epoch))
+
+                print("Generated reply")
+                print(output.shape)
+                print(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]]))
+                print("Real  reply")
+                print(corpus.ids_to_tokens([int(i) for i in reply[:,0]]))
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
     return losses
@@ -214,7 +220,7 @@ if __name__ == '__main__':
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
     print('Starting Generator MLE Training...')
-    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS, corpus)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
