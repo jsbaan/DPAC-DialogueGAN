@@ -35,8 +35,7 @@ import pickle
 import os
 import time
 
-DEVICE = torch.device('cpu')  #'cuda:0'
-CUDA = False
+DEVICE = torch.device('cuda:0')  #'cpu'
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
@@ -48,8 +47,8 @@ GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
-DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
-MC = True
+DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
+MC = False
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -142,8 +141,8 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     if DISCRIMINATOR_LM:
         fake_rewards = -torch.mean(dis.get_rewards(fake_reply), dim=1)
         real_rewards = -torch.mean(dis.get_rewards(real_reply), dim=1)
-        print(real_rewards)
         loss = -torch.mean((real_rewards - fake_rewards))
+        print("loss is ", loss)
     else:
         fake_targets = torch.zeros(BATCH_SIZE)
         real_targets = torch.ones(BATCH_SIZE)
@@ -202,33 +201,37 @@ if __name__ == '__main__':
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
 
-    if CUDA:
-        dis = dis.cuda()
+    dis = dis.to(DEVICE)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
     # print('Starting Generator MLE Training...')
     # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
-    # #  OPTIONAL: Pretrain discriminator
-    # print('\nStarting Discriminator Training...')
-    # train_discriminator(dis, dis_optimizer, oracle_samples, gen, oracle, 50, 3)
-
-    # # ADVERSARIAL TRAINING
-    print('\nStarting Adversarial Training...')
+    #  OPTIONAL: Pretrain discriminator
+    print('\nStarting Discriminator Training...')
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-        # TRAIN GENERATOR
-        sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
-            print('\nAdversarial Training Generator: ')
-            perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
-            if batch % 10 == 0:
-                print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
-
-            # TRAIN DISCRIMINATOR
-            print('\nAdversarial Training Discriminator : ')
+            print('\n Pretraining Discriminator: ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+
+
+    # # ADVERSARIAL TRAINING
+    # print('\nStarting Adversarial Training...')
+    # for epoch in range(ADV_TRAIN_EPOCHS):
+    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+    #     # TRAIN GENERATOR
+    #     sys.stdout.flush()
+    #     for (batch, (context, reply)) in enumerate(train_data_loader):
+    #         print('\nAdversarial Training Generator: ')
+    #         perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
+    #         if batch % 10 == 0:
+    #             print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
+
+    #         # TRAIN DISCRIMINATOR
+    #         print('\nAdversarial Training Discriminator : ')
+    #         train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
 
 
 

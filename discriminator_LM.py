@@ -6,13 +6,12 @@ import numpy as np
 
 class Discriminator(nn.Module):
 
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, max_seq_len, gpu=False, dropout=0.2, device="cpu"):
+    def __init__(self, embedding_dim, hidden_dim, vocab_size, max_seq_len, dropout=0.2, device="cpu"):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.embedding_dim = embedding_dim
         self.max_seq_len = max_seq_len
         self.vocab_size = vocab_size
-        self.gpu = gpu
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
         self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False, dropout=dropout)
@@ -23,10 +22,7 @@ class Discriminator(nn.Module):
     def init_hidden(self, batch_size):
         h = autograd.Variable(torch.zeros(2*1, batch_size, self.hidden_dim))
 
-        if self.gpu:
-            return h.cuda()
-        else:
-            return h
+        return h.to(self.device)
 
     def forward(self, response, hidden_response):
         # input dim                                                         # batch_size x seq_len
