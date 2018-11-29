@@ -200,5 +200,5 @@ class Generator(nn.Module):
         #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
         loss = - torch.mean(loss)
         if lamb > 0:
-            loss = loss - lamb * torch.mean(-word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
+            loss = loss - lamb * torch.mean(- word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss
