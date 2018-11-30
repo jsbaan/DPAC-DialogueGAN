@@ -15,7 +15,7 @@ class Discriminator(nn.Module):
         self.device = device
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False, dropout=dropout)
+        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
         self.gru2hidden = nn.Linear(hidden_dim, hidden_dim)
         self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
@@ -33,8 +33,8 @@ class Discriminator(nn.Module):
         _, hidden_response = self.gru_response(emb_response, hidden_response)
         hidden_response = hidden_response.permute(1, 0, 2).contiguous()
         out = self.gru2hidden(hidden_response[:, -1, :])             # batch_size x 4*hidden_dim
-        out = torch.tanh(out)
-        out = self.dropout_linear(out)
+        # out = torch.tanh(out)
+        # out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
         out = torch.softmax(out, dim=1)
         return out
