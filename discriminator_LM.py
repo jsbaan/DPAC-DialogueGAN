@@ -15,10 +15,12 @@ class Discriminator(nn.Module):
         self.device = device
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
+        # self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
         self.gru2hidden = nn.Linear(hidden_dim, hidden_dim)
         self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
+
+        self.gru2hidden = nn.LSTM(embedding_dim, hidden_dim, num_layers=2)
 
     def init_hidden(self, batch_size):
         h = autograd.Variable(torch.zeros(2*1, batch_size, self.hidden_dim))
@@ -36,7 +38,7 @@ class Discriminator(nn.Module):
         # out = torch.tanh(out)
         # out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        # out = torch.softmax(out, dim=1)
+        out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
