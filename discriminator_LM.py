@@ -36,7 +36,7 @@ class Discriminator(nn.Module):
         # out = torch.tanh(out)
         # out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        out = torch.softmax(out, dim=1)
+        # out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
