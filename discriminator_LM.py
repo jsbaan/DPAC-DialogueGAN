@@ -20,7 +20,7 @@ class Discriminator(nn.Module):
         self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
 
-        self.gru2hidden = nn.LSTM(embedding_dim, hidden_dim, num_layers=2)
+        self.gru_response = nn.LSTM(embedding_dim, hidden_dim, num_layers=2)
 
     def init_hidden(self, batch_size):
         h = autograd.Variable(torch.zeros(2*1, batch_size, self.hidden_dim))
