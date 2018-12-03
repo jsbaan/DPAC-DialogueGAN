@@ -2,7 +2,7 @@ from torch.utils.data.dataset import Dataset
 from torch import LongTensor
 
 class DPDataset(Dataset):
-    def __init__(self, corpus, dialogs, context_size=3, min_reply_length=None, max_reply_length=None):
+    def __init__(self, corpus, dialogs, context_size=2, min_reply_length=None, max_reply_length=None):
         self.corpus = corpus
 
         self.contexts = []
