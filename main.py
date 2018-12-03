@@ -47,8 +47,8 @@ BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 50
 ADV_TRAIN_EPOCHS = 50
 
-GEN_EMBEDDING_DIM = 64
-GEN_HIDDEN_DIM = 64
+GEN_EMBEDDING_DIM = 32
+GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     gen = gen.to(DEVICE)
 
     dis_optimizer = optim.Adagrad(dis.parameters())  ## ADAGRAD ??
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
+    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-3)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
