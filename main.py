@@ -56,10 +56,12 @@ GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
-MC = True
+MC = False
+USE_EXP_REPLAY = False
 CAPACITY_RM = 100000
 PRETRAIN = False
 DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
+AC_WARMUP = 1000
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -133,6 +135,23 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     return perplexity
 
 def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
+    """
+    Actor Critic Pseudocode:
+
+    for word, t in enumerate(setence):
+        state = [word_0, ..., word_t]
+        action = gen.forward(word)
+        next_state = [word_0, ..., word_{t+1}]
+        reward = dis(word{t+1} | state)
+        store (s, a, r, s', done ) in replay memory
+
+        # Training
+        sample batch from replay memory
+        Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
+        update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
+
+        Question: Could also update discriminator in this loop?
+    """
     # Run input through encoder
     encoder_output, hidden = gen.encoder(context)
     hidden = hidden[:gen.decoder.n_layers]
@@ -140,7 +159,7 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
     samples = torch.autograd.Variable(torch.zeros(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
     samples[:,0] = input
 
-    # Pass through decoder and sample from resulting vocab distribution
+    # Pass through decoder and sample action (word) from resulting vocab distribution
     for t in range(1, MAX_SEQ_LEN):
         output, hidden, attn_weights = gen.decoder(
                 input, hidden, encoder_output)
@@ -148,41 +167,65 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
         # Sample action (token) for entire batch from predicted vocab distribution
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
         state = samples[:,:t]
-        print(action.size(),state.size())
         reward = dis.get_reward(state, action)
         samples[:, t] = action
         next_state = samples[:,:t+1]
-
-        # Store (batch of) transition(s) in replay memory
-        memory.push_batch((state,action,reward,next_state,done))
-
-        # Feed action back into decoder as current input
+        # TODO fix done by checking for terminal states (in batch?how?)
+        done = None
         input = torch.autograd.Variable(action)
 
-        # Train using AC
-        if memory.__len__() > warmup:
-            pass
-            # Sample batch from replay memory
+        ## Train using AC without experience replay
+        if not USE_EXP_REPLAY:
+            q_values = critic.forward(state)
+            with torch.no_grad():
+                mask = (done==False).float()
+                q_values_target = mask*(discount_factor * critic.forward(next_state)) + reward
 
-            # Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
+            critic_loss = F.smooth_l1_loss(cur_value, next_value)
 
-            # update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
+        ######## LAB CODE FOR ACTOR CRITIC
+        # # Compute value/critic loss
+        # cur_value = critic(state).squeeze(1)
+        # with torch.no_grad():
+        #     mask = (done==False).float()
+        #     next_value = mask*(discount_factor * critic(next_state).squeeze(1)) + reward
+        # value_loss = F.smooth_l1_loss(cur_value, next_value)
+        #
+        # # Compute actor loss
+        # v = reward + discount_factor * critic(next_state).squeeze(1)
+        # actor_loss = -torch.mean(log_ps * v.detach())
+        #
+        #
+        # # The loss is composed of the value_loss (for the critic) and the actor_loss
+        # loss = value_loss + actor_loss
+        #
+        # # backpropagation of loss to Neural Network (PyTorch magic)
+        # optimizer.zero_grad()
+        # loss.backward()
+        # optimizer.step()
 
-        """
-        for word, t in enumerate(setence):
-            state = [word_0, ..., word_t]
-            action = gen.forward(word)
-            next_state = [word_0, ..., word_{t+1}]
-            reward = dis(word{t+1} | state)
-            store (s, a, r, s', done ) in replay memory
+        #######
 
-            # Training
-            sample batch from replay memory
-            Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
-            update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
 
-            Question: Could also update discriminator in this loop?
-        """
+
+            # Update actor (generator) --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
+            actor_loss =
+
+        ## Train using experience replay
+        elif USE_EXP_REPLAY:
+            # TODO decide when done should be true (first padding token generated?)
+            # TODO decide whether to put entire batch as one tuple or as seperate entries
+            # TODO decide whether padding the experience replay buffer makes sense
+            #       (would this solve the issue of variable length states?)
+
+            # Store (batch of) transition(s) in replay memory
+            done = False
+            memory.push_batch((state,action,reward,next_state,done))
+            if memory.__len__() > AC_WARMUP:
+                # Sample batch from replay memory
+                memory.sample(BATCH_SIZE)
+                # Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
+                # update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
     quit()
     return
 
@@ -245,7 +288,6 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     loss.backward()
     dis_opt.step()
 
-
 def load_data(path='dataset.pickle'):
     """
     Load data set
@@ -265,7 +307,6 @@ def load_data(path='dataset.pickle'):
             train_data_loader= pickle.load(handle)
         corpus = train_data_loader.dataset.corpus
     return corpus,train_data_loader
-
 
 if __name__ == '__main__':
     '''
@@ -288,8 +329,7 @@ if __name__ == '__main__':
     dis = dis.to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
-    # critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    critic = None
+    critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     memory = replay_memory.ReplayMemory(CAPACITY_RM)
 
 
