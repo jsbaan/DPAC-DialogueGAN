@@ -30,6 +30,8 @@ import generator
 import discriminator
 import discriminator_LM
 import critic
+import language_model
+
 from helpers import *
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
@@ -42,22 +44,23 @@ if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
-CUDA = False
+
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 50
 ADV_TRAIN_EPOCHS = 50
+LM_TRAIN_EPOCHS = 20
 
 GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
-DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 CAPACITY_RM = 100000
 PRETRAIN = False
+DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -190,6 +193,8 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # Batchsize is 32
     # context is 32 x max_context_size
 
+    # torch.nn.utils.clip_grad_norm(discriminator.parameters(), max_norm=5.0)
+
     fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
@@ -201,9 +206,16 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
     # print(30 * "-")
     if DISCRIMINATOR_LM:
-        fake_rewards = -torch.mean(dis.get_rewards(fake_reply), dim=1)
-        real_rewards = -torch.mean(dis.get_rewards(real_reply), dim=1)
-        print(real_rewards)
+        # print("Generated reply")
+        # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+        # print("Real  reply")
+        # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+        fake_rewards = torch.mean(dis.get_rewards(fake_reply), dim=1)
+        real_rewards = torch.mean(dis.get_rewards(real_reply), dim=1)
+        print("fake reward ", torch.mean(fake_rewards).item())
+        print("real reward ", torch.mean(real_rewards).item())
+        # print("fake rewards ", fake_rewards)
+        # print("real rewards ", real_rewards)
         loss = -torch.mean((real_rewards - fake_rewards))
     else:
         fake_targets = torch.zeros(BATCH_SIZE)
@@ -227,8 +239,10 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
         total_acc = (correct_real + correct_fake)/2
         print(' average_loss = %.4f, train_acc = %.4f' % (
             total_loss, total_acc))
+
     loss.backward()
     dis_opt.step()
+
 
 def load_data(path='dataset.pickle'):
     """
@@ -250,6 +264,17 @@ def load_data(path='dataset.pickle'):
         corpus = train_data_loader.dataset.corpus
     return corpus,train_data_loader
 
+
+def train_language_model(lm, optimizer, data, epochs):
+    pad_token = data.dataset.corpus.token_to_id('<pad>')
+    loss_per_epoch = []
+    for epoch in range(epochs):
+        print('epoch %d : ' % (epoch + 1), end='')
+        total_loss = 0
+        losses = []
+        for(iter, (context, reply)) in enumerate(train_data_loader):
+            optimizer.zero_grad()
+
 if __name__ == '__main__':
     '''
     Main training loop. Pre-trains the generator and discriminator using MLE
@@ -266,11 +291,19 @@ if __name__ == '__main__':
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     else:
         dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+
+
+    dis = dis.to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
     # critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     critic = None
     memory = replay_memory.ReplayMemory(CAPACITY_RM)
+
+    lm = language_model.LM(DIS_HIDDEN_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    lm = lm.to(DEVICE)
+    lm_optimizer = optim.Adagrad(lm.parameters())
+
 
     # OPTIONAL: Pretrain generator
     if PRETRAIN:
@@ -280,7 +313,12 @@ if __name__ == '__main__':
 
         #  OPTIONAL: Pretrain discriminator
         print('\nStarting Discriminator Training...')
-        train_discriminator(dis, dis_optimizer, oracle_samples, gen, oracle, 50, 3)
+        for epoch in range(ADV_TRAIN_EPOCHS):
+            print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+            for (batch, (context, reply)) in enumerate(train_data_loader):
+                print('\n Pretraining Discriminator: ')
+                train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+
 
     # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
@@ -299,3 +337,11 @@ if __name__ == '__main__':
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+
+
+    # # Train Language Model
+    # print('\nStarting LM Training...')
+    # for epoch in range(ADV_TRAIN_EPOCHS):
+    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+    #     for (batch, (context, reply)) in enumerate(train_data_loader):
+    #         train_language_model(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)

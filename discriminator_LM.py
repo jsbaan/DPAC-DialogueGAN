@@ -6,32 +6,30 @@ import numpy as np
 
 class Discriminator(nn.Module):
 
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, max_seq_len, gpu=False, dropout=0.2, device="cpu"):
+    def __init__(self, embedding_dim, hidden_dim, vocab_size, max_seq_len, dropout=0.2, device="cpu"):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.embedding_dim = embedding_dim
         self.max_seq_len = max_seq_len
         self.vocab_size = vocab_size
-        self.gpu = gpu
+        self.device = device
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False, dropout=dropout)
+        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
         self.gru2hidden = nn.Linear(hidden_dim, hidden_dim)
         self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
 
+
     def init_hidden(self, batch_size):
         h = autograd.Variable(torch.zeros(2*1, batch_size, self.hidden_dim))
 
-        if self.gpu:
-            return h.cuda()
-        else:
-            return h
+        return h.to(self.device)
 
     def forward(self, response, hidden_response):
         # input dim                                                         # batch_size x seq_len
         # batch_size x 4 x hidden_dim
-        emb_response = self.embeddings(response) # batchsize x embedding dim
+        emb_response = self.embeddings(response.to(self.device)) # batchsize x embedding dim
         emb_response = emb_response.permute(1, 0, 2)
         _, hidden_response = self.gru_response(emb_response, hidden_response)
         hidden_response = hidden_response.permute(1, 0, 2).contiguous()
@@ -39,7 +37,7 @@ class Discriminator(nn.Module):
         out = torch.tanh(out)
         out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        out = torch.softmax(out, dim=1)
+        # out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
@@ -79,9 +77,22 @@ class Discriminator(nn.Module):
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
             next_word = self.batchClassify(inp.long())
-            reward = criterion(next_word, target.long())
-            rewards[:, t] = reward 
+            rewards[:, t] = -criterion(next_word, target.long().to(self.device))
+
         return rewards
+
+    def get_reward(self, history, word):
+        """
+        Calculate reward for a new word based on the history
+        """
+        criterion = nn.CrossEntropyLoss(reduction="none")
+        target = self.batchClassify(history.long().to(self.device))
+        reward = -criterion(word, target)
+
+        return reward
+
+
+
 
 
 
