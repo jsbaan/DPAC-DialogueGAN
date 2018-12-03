@@ -86,9 +86,8 @@ class Discriminator(nn.Module):
         Calculate reward for a new word based on the history
         """
         criterion = nn.CrossEntropyLoss(reduction="none")
-        target = self.batchClassify(history.long().to(self.device))
-        reward = -criterion(word, target)
-
+        output = self.batchClassify(history.long())
+        reward = -criterion(output, word.long().to(self.device))
         return reward
 
 
