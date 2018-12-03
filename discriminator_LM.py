@@ -34,10 +34,10 @@ class Discriminator(nn.Module):
         _, hidden_response = self.gru_response(emb_response, hidden_response)
         hidden_response = hidden_response.permute(1, 0, 2).contiguous()
         out = self.gru2hidden(hidden_response[:, -1, :])             # batch_size x 4*hidden_dim
-        # out = torch.tanh(out)
-        # out = self.dropout_linear(out)
+        out = torch.tanh(out)
+        out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        out = torch.softmax(out, dim=1)
+        # out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
@@ -78,7 +78,10 @@ class Discriminator(nn.Module):
             target = reply[np.arange(batch_size), t+1]
             next_word = self.batchClassify(inp.long())
             reward = criterion(next_word, target.long().to(self.device))
-            rewards[:, t] = torch.log(reward)
+            rewards[:, t] = reward
+            # rewards[:, t] = torch.clamp(-torch.log(reward), -12, 12)
+        # print("next word ", next_word)
+        # print("reward ", reward)
         return rewards
 
 

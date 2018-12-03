@@ -28,6 +28,7 @@ from torch.nn import functional as F
 import generator
 import discriminator
 import discriminator_LM
+import language_model
 from helpers import *
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
@@ -35,18 +36,19 @@ import pickle
 import os
 import time
 
-DEVICE = torch.device('cuda:0')  #'cpu'
+DEVICE = torch.device('cpu')  #'cpu'
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 50
+LM_TRAIN_EPOCHS = 20
 
 GEN_EMBEDDING_DIM = 32
 GEN_HIDDEN_DIM = 32
-DIS_EMBEDDING_DIM = 128
-DIS_HIDDEN_DIM = 256
+DIS_EMBEDDING_DIM = 64
+DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = False
 
@@ -128,6 +130,8 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # Batchsize is 32
     # context is 32 x max_context_size
 
+    # torch.nn.utils.clip_grad_norm(discriminator.parameters(), max_norm=5.0)
+
     fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
@@ -143,10 +147,12 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
         # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
         # print("Real  reply")
         # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
-        fake_rewards = -torch.mean(dis.get_rewards(fake_reply), dim=1)
-        real_rewards = -torch.mean(dis.get_rewards(real_reply), dim=1)
+        fake_rewards = torch.mean(dis.get_rewards(fake_reply), dim=1)
+        real_rewards = torch.mean(dis.get_rewards(real_reply), dim=1)
         print("fake reward ", torch.mean(fake_rewards).item())
         print("real reward ", torch.mean(real_rewards).item())
+        # print("fake rewards ", fake_rewards)
+        # print("real rewards ", real_rewards)
         loss = -torch.mean((real_rewards - fake_rewards))
     else:
         fake_targets = torch.zeros(BATCH_SIZE)
@@ -174,7 +180,18 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     loss.backward()
     dis_opt.step()
 
-  
+def train_language_model(lm, optimizer, data, epochs):
+    pad_token = data.dataset.corpus.token_to_id('<pad>')
+    loss_per_epoch = []
+    for epoch in range(epochs):
+        print('epoch %d : ' % (epoch + 1), end='')
+        total_loss = 0
+        losses = []
+        for(iter, (context, reply)) in enumerate(train_data_loader):
+            optimizer.zero_grad()
+
+
+
 
 # MAIN
 if __name__ == '__main__':
@@ -209,8 +226,10 @@ if __name__ == '__main__':
     dis = dis.to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
+    lm = language_model.LM(DIS_HIDDEN_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    lm = lm.to(DEVICE)
+    lm_optimizer = optim.Adagrad(lm.parameters())
 
-    
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
@@ -224,6 +243,14 @@ if __name__ == '__main__':
         for (batch, (context, reply)) in enumerate(train_data_loader):
             print('\n Pretraining Discriminator: ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+
+
+    # # Train Language Model
+    # print('\nStarting LM Training...')
+    # for epoch in range(ADV_TRAIN_EPOCHS):
+    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+    #     for (batch, (context, reply)) in enumerate(train_data_loader):
+    #         train_language_model(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)
 
 
     # # ADVERSARIAL TRAINING
