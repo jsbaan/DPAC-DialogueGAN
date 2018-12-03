@@ -30,7 +30,6 @@ import generator
 import discriminator
 import discriminator_LM
 import critic
-import language_model
 
 from helpers import *
 from dataloader.dp_corpus import DPCorpus
@@ -149,7 +148,8 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
         # Sample action (token) for entire batch from predicted vocab distribution
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
         state = samples[:,:t]
-        # reward = dis.get_reward(state, action)
+        print(action.size(),state.size())
+        reward = dis.get_reward(state, action)
         samples[:, t] = action
         next_state = samples[:,:t+1]
 
@@ -161,13 +161,14 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
 
         # Train using AC
         if memory.__len__() > warmup:
+            pass
             # Sample batch from replay memory
 
             # Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
 
             # update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
 
-    """
+        """
         for word, t in enumerate(setence):
             state = [word_0, ..., word_t]
             action = gen.forward(word)
@@ -181,7 +182,7 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
             update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
 
             Question: Could also update discriminator in this loop?
-    """
+        """
     quit()
     return
 
@@ -265,16 +266,6 @@ def load_data(path='dataset.pickle'):
     return corpus,train_data_loader
 
 
-def train_language_model(lm, optimizer, data, epochs):
-    pad_token = data.dataset.corpus.token_to_id('<pad>')
-    loss_per_epoch = []
-    for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
-        total_loss = 0
-        losses = []
-        for(iter, (context, reply)) in enumerate(train_data_loader):
-            optimizer.zero_grad()
-
 if __name__ == '__main__':
     '''
     Main training loop. Pre-trains the generator and discriminator using MLE
@@ -299,10 +290,6 @@ if __name__ == '__main__':
     # critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     critic = None
     memory = replay_memory.ReplayMemory(CAPACITY_RM)
-
-    lm = language_model.LM(DIS_HIDDEN_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    lm = lm.to(DEVICE)
-    lm_optimizer = optim.Adagrad(lm.parameters())
 
 
     # OPTIONAL: Pretrain generator
@@ -337,11 +324,3 @@ if __name__ == '__main__':
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-
-
-    # # Train Language Model
-    # print('\nStarting LM Training...')
-    # for epoch in range(ADV_TRAIN_EPOCHS):
-    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-    #     for (batch, (context, reply)) in enumerate(train_data_loader):
-    #         train_language_model(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)
