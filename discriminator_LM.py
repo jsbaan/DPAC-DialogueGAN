@@ -77,12 +77,22 @@ class Discriminator(nn.Module):
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
             next_word = self.batchClassify(inp.long())
-            reward = criterion(next_word, target.long().to(self.device))
-            rewards[:, t] = reward
-            # rewards[:, t] = torch.clamp(-torch.log(reward), -12, 12)
-        # print("next word ", next_word)
-        # print("reward ", reward)
+            rewards[:, t] = -criterion(next_word, target.long().to(self.device))
+
         return rewards
+
+    def get_reward(self, history, word):
+        """
+        Calculate reward for a new word based on the history
+        """
+        criterion = nn.CrossEntropyLoss(reduction="none")
+        target = self.batchClassify(history.long().to(self.device))
+        reward = -criterion(word, target)
+
+        return reward
+
+
+
 
 
 
