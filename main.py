@@ -57,6 +57,7 @@ DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 CAPACITY_RM = 100000
+PRETRAIN = False
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -101,16 +102,68 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
     return losses
 
-def train_generator_PG(context, reply, gen, gen_opt, dis, memory, critic):
+def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
     Training is done for one batch.
     """
-    # # Forward pass
+    # Forward pass
+    reply, word_probabilities, hiddens = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+    entropy = torch.mean(word_probabilities.log(), dim=1)
+    perplexity = torch.mean(2**(-entropy)).item()
 
-    ############################################################################
-    ##########                      PSEUDO CODE                #################
-    ############################################################################
+    if MC:
+        rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=1)
+    elif DISCRIMINATOR_LM:
+        rewards = dis.get_rewards(reply)
+    else:
+        rewards = dis.batchClassify(context.long(), reply.long())
+
+    # Backward pass
+    gen_opt.zero_grad()
+    if MC or DISCRIMINATOR_LM == True:
+        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=True) # FIX
+    else:
+        pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=False)
+
+    pg_loss.backward()
+    gen_opt.step()
+    return perplexity
+
+def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
+    # Run input through encoder
+    encoder_output, hidden = gen.encoder(context)
+    hidden = hidden[:gen.decoder.n_layers]
+    input = torch.autograd.Variable(context.data[0, :])  # sos
+    samples = torch.autograd.Variable(torch.zeros(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
+    samples[:,0] = input
+
+    # Pass through decoder and sample from resulting vocab distribution
+    for t in range(1, MAX_SEQ_LEN):
+        output, hidden, attn_weights = gen.decoder(
+                input, hidden, encoder_output)
+
+        # Sample action (token) for entire batch from predicted vocab distribution
+        action = torch.multinomial(torch.exp(output), 1).view(-1).data
+        state = samples[:,:t]
+        # reward = dis.get_reward(state, action)
+        samples[:, t] = action
+        next_state = samples[:,:t+1]
+
+        # Store (batch of) transition(s) in replay memory
+        memory.push_batch((state,action,reward,next_state,done))
+
+        # Feed action back into decoder as current input
+        input = torch.autograd.Variable(action)
+
+        # Train using AC
+        if memory.__len__() > warmup:
+            # Sample batch from replay memory
+
+            # Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
+
+            # update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
+
     """
         for word, t in enumerate(setence):
             state = [word_0, ..., word_t]
@@ -126,29 +179,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, memory, critic):
 
             Question: Could also update discriminator in this loop?
     """
-    
-    # reply, word_probabilities, hiddens = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
-    # entropy = torch.mean(word_probabilities.log(), dim=1)
-    # perplexity = torch.mean(2**(-entropy)).item()
-
-    # if MC:
-    #     rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples=1)
-    # elif DISCRIMINATOR_LM:
-    #     rewards = dis.get_rewards(reply)
-    # else:
-    #     rewards = dis.batchClassify(context.long(), reply.long())
-
-    # # Backward pass
-    # gen_opt.zero_grad()
-    # if MC or DISCRIMINATOR_LM == True:
-    #     pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=True) # FIX
-    # else:
-    #     pg_loss = gen.batchPGLoss(context, reply, rewards, word_probabilities, MC_LM=False)
-
-    # pg_loss.backward()
-    # gen_opt.step()
-    return perplexity
-
+    quit()
+    return
 
 def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
     """
@@ -198,25 +230,33 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     loss.backward()
     dis_opt.step()
 
-
-
-# MAIN
-if __name__ == '__main__':
-    # Load data set
-    if not os.path.isfile("dataset.pickle"):
+def load_data(path='dataset.pickle'):
+    """
+    Load data set
+    """
+    if not os.path.isfile(path):
         print("Saving the data set")
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
         train_data_loader = DPDataLoader(train_dataset,batch_size=BATCH_SIZE)
-        with open('dataset.pickle', 'wb') as handle:
+        with open(path, 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
             corpus = train_data_loader.dataset.corpus
     else:
         print("Loading the data set")
-        with open('dataset.pickle', 'rb') as handle:
+        with open(path, 'rb') as handle:
             train_data_loader= pickle.load(handle)
         corpus = train_data_loader.dataset.corpus
+    return corpus,train_data_loader
+
+if __name__ == '__main__':
+    '''
+    Main training loop. Pre-trains the generator and discriminator using MLE
+    and then uses PG to alternately train them.
+    '''
+    # Load data set
+    corpus, train_data_loader = load_data()
 
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
@@ -228,35 +268,34 @@ if __name__ == '__main__':
         dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
-    critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    # critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    critic = None
     memory = replay_memory.ReplayMemory(CAPACITY_RM)
-    if CUDA:
-        dis = dis.cuda()
 
     # OPTIONAL: Pretrain generator
-    # checkpoint = torch.load('generator_checkpoint.pth.tar')
-    # print('Starting Generator MLE Training...')
-    # train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    if PRETRAIN:
+        checkpoint = torch.load('generator_checkpoint.pth.tar')
+        print('Starting Generator MLE Training...')
+        train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
-    # #  OPTIONAL: Pretrain discriminator
-    # print('\nStarting Discriminator Training...')
-    # train_discriminator(dis, dis_optimizer, oracle_samples, gen, oracle, 50, 3)
+        #  OPTIONAL: Pretrain discriminator
+        print('\nStarting Discriminator Training...')
+        train_discriminator(dis, dis_optimizer, oracle_samples, gen, oracle, 50, 3)
 
     # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-        # TRAIN GENERATOR
         sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
+            # TRAIN GENERATOR
             print('\nAdversarial Training Generator: ')
-            perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
+            # perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
+            perplexity = train_generator_PGAC(context.permute(1,0), reply.permute(1,0),\
+                gen, gen_optimizer, dis, memory, critic)
             if batch % 10 == 0:
                 print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-
-
-
