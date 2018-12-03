@@ -16,8 +16,8 @@ class Generator(nn.Module):
         enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, device='cpu'):
         super(Generator, self).__init__()
 
-        encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout, device=device)
-        decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout, device=device)
+        encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout)
+        decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout)
 
         self.max_len = max_len
         self.device = device
@@ -89,6 +89,7 @@ class Generator(nn.Module):
             output = autograd.Variable(batch_token_sample)
 
         return samples, samples_prob, hiddens
+
 
     def monte_carlo(self, dis, context, seq, hiddens, num_samples):
 
