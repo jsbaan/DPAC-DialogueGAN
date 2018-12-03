@@ -13,21 +13,20 @@ import sys
 class Generator(nn.Module):
 
     def __init__(self, vocab_size, hidden_size, embed_size, max_len, enc_n_layers=2, \
-        enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, teacher_forcing_ratio=0.5, device='cpu'):
+        enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, teacher_forcing_ratio=0.5):
         super(Generator, self).__init__()
 
         self.vocab_size = vocab_size
         self.max_len = max_len
-        self.device = device
         self.teacher_forcing_ratio = teacher_forcing_ratio
 
-        self.encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout, device=device)
-        self.decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout, device=device)
+        self.encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout)
+        self.decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout)
 
     def forward(self, src, tgt):
         batch_size = src.size(1)
         vocab_size = self.decoder.output_size
-        outputs = torch.zeros(self.max_len, batch_size, vocab_size).to(self.device)
+        outputs = torch.zeros(self.max_len, batch_size, vocab_size)
 
         # TODO: Check what happens here. Hidden representation dimension is strange
         encoder_output, hidden = self.encoder(src)
@@ -45,8 +44,7 @@ class Generator(nn.Module):
             if is_teacher:
                 previous_output = tgt.data[t]
             else:
-                top1 = output.data.max(1)[1]
-                previous_output = (tgt.data[t] if is_teacher else top1).to(self.device)
+                previous_output = output.data.argmax(1)
 
         return outputs
 
@@ -69,8 +67,8 @@ class Generator(nn.Module):
         hiddens = []
         batch_size = context.size(1)
         vocab_size = self.decoder.output_size
-        samples = autograd.Variable(torch.zeros(batch_size, self.max_len)).to(self.device)
-        samples_prob = autograd.Variable(torch.zeros(batch_size, self.max_len)).to(self.device)
+        samples = autograd.Variable(torch.zeros(batch_size, self.max_len))
+        samples_prob = autograd.Variable(torch.zeros(batch_size, self.max_len))
 
         # Run input through encoder
         encoder_output, hidden = self.encoder(context)
@@ -115,8 +113,8 @@ class Generator(nn.Module):
         # Initialize sample
         batch_size = seq.size(0)
         vocab_size = self.decoder.output_size
-        samples = autograd.Variable(torch.zeros(batch_size, self.max_len)).to(self.device)
-        samples_prob = autograd.Variable(torch.zeros(batch_size, self.max_len)).to(self.device)
+        samples = autograd.Variable(torch.zeros(batch_size, self.max_len))
+        samples_prob = autograd.Variable(torch.zeros(batch_size, self.max_len))
         encoder_output, _ = self.encoder(context.permute(1,0))
         rewards = torch.zeros(self.max_len, num_samples, batch_size)
         for t in range(seq.size(1)):

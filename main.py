@@ -47,8 +47,8 @@ BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 50
 ADV_TRAIN_EPOCHS = 50
 
-GEN_EMBEDDING_DIM = 32
-GEN_HIDDEN_DIM = 32
+GEN_EMBEDDING_DIM = 128
+GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
@@ -76,8 +76,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
             tgt_tokens = reply[1:].contiguous().view(-1)
 
-            # TODO: CHECK ignore_index
-            loss = F.nll_loss(pred_dist, tgt_tokens)#, ignore_index=pad_token)
+            loss = F.nll_loss(pred_dist, tgt_tokens)
 
             # Backpropagate loss
             loss.backward()
@@ -98,7 +97,6 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                 },'generator_checkpoint{}.pth.tar'.format(epoch))
 
                 print("Generated reply")
-                print(output.shape)
                 print(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]]))
                 print("Real  reply")
                 print(corpus.ids_to_tokens([int(i) for i in reply[:,0]]))
@@ -207,7 +205,7 @@ if __name__ == '__main__':
         corpus = train_data_loader.dataset.corpus
 
     # Initalize Networks and optimizers
-    gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
+    gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
@@ -218,7 +216,7 @@ if __name__ == '__main__':
     gen = gen.to(DEVICE)
 
     dis_optimizer = optim.Adagrad(dis.parameters())  ## ADAGRAD ??
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
+    gen_optimizer = optim.Adam(gen.parameters(), lr=2e-3)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
