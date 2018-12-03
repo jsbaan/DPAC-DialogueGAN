@@ -59,6 +59,9 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     corpus = data.dataset.corpus
     pad_token = corpus.token_to_id(corpus.PAD)
 
+    loss_func = torch.nn.NLLLoss()
+    loss_func.to(DEVICE)
+
     loss_per_epoch = []
     for epoch in range(epochs):
         print('epoch %d : ' % (epoch + 1))
@@ -76,7 +79,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             pred_dist = output[1:].view(-1, VOCAB_SIZE).to(DEVICE)
             tgt_tokens = reply[1:].contiguous().view(-1).to(DEVICE)
 
-            loss = F.nll_loss(pred_dist, tgt_tokens)
+            loss = loss_func(pred_dist, tgt_tokens)
 
             # Backpropagate loss
             loss.backward()
