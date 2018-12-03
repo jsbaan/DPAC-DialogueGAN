@@ -73,8 +73,8 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             output = gen.forward(context, reply)
 
             # Compute loss
-            pred_dist = output[1:].view(-1, VOCAB_SIZE)
-            tgt_tokens = reply[1:].contiguous().view(-1)
+            pred_dist = output[1:].view(-1, VOCAB_SIZE).to(DEVICE)
+            tgt_tokens = reply[1:].contiguous().view(-1).to(DEVICE)
 
             loss = F.nll_loss(pred_dist, tgt_tokens)
 
