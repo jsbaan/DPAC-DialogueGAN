@@ -54,27 +54,30 @@ DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 
-def train_generator_MLE(gen, optimizer, data, epochs, corpus):
+def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
-    pad_token = data.dataset.corpus.token_to_id('<pad>')
+    corpus = data.dataset.corpus
+    pad_token = corpus.token_to_id(corpus.PAD)
+
     loss_per_epoch = []
     for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
-        sys.stdout.flush()
+        print('epoch %d : ' % (epoch + 1))
+
         total_loss = 0
         losses = []
         for (iter, (context, reply)) in enumerate(train_data_loader):
-            # print('Epoch {} Iter {}'.format(epoch+1,iter))
             optimizer.zero_grad()
             context = context.permute(1,0).to(DEVICE)
             reply = reply.permute(1,0).to(DEVICE)
+
             output = gen.forward(context, reply)
 
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE)
             tgt_tokens = reply[1:].contiguous().view(-1)
 
-            loss = F.nll_loss(pred_dist, tgt_tokens, ignore_index=pad_token)
+            # TODO: CHECK ignore_index
+            loss = F.nll_loss(pred_dist, tgt_tokens)#, ignore_index=pad_token)
 
             # Backpropagate loss
             loss.backward()
@@ -215,12 +218,12 @@ if __name__ == '__main__':
     gen = gen.to(DEVICE)
 
     dis_optimizer = optim.Adagrad(dis.parameters())  ## ADAGRAD ??
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-3)
+    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
     print('Starting Generator MLE Training...')
-    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS, corpus)
+    train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
     # #  OPTIONAL: Pretrain discriminator
     # print('\nStarting Discriminator Training...')
