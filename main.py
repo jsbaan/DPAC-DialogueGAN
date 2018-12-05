@@ -51,9 +51,9 @@ MC = True
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
     corpus = data.dataset.corpus
-    pad_token = corpus.token_to_id(corpus.PAD)
+    pad_id = corpus.token_to_id(corpus.PAD)
 
-    loss_func = torch.nn.NLLLoss(ignore_index=pad_token)
+    loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
     loss_func.to(DEVICE)
 
     loss_per_epoch = []
@@ -203,7 +203,9 @@ if __name__ == '__main__':
         corpus = train_data_loader.dataset.corpus
 
     # Initalize Networks and optimizers
-    gen = Generator2(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    sos_id = corpus.token_to_id(corpus.SOS)
+    eou_id = corpus.token_to_id(corpus.EOU)
+    gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
