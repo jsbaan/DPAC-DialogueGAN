@@ -29,8 +29,6 @@ class Generator2(nn.Module):
         self.seq2seq = Seq2seq(self.encoder, self.beam_decoder)
 
     def forward(self, src, tgt):
-        src = src.t()
-        tgt = tgt.t()
         outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
 
         start_tokens = torch.zeros(64, self.vocab_size)

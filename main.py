@@ -53,7 +53,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     corpus = data.dataset.corpus
     pad_token = corpus.token_to_id(corpus.PAD)
 
-    loss_func = torch.nn.NLLLoss()
+    loss_func = torch.nn.NLLLoss(ignore_index=pad_token)
     loss_func.to(DEVICE)
 
     loss_per_epoch = []
@@ -67,7 +67,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             context = context.permute(1,0).to(DEVICE)
             reply = reply.permute(1,0).to(DEVICE)
 
-            output = gen.forward(context, reply)
+            output = gen.forward(context.t().to(DEVICE), reply.t().to(DEVICE))
 
 
             # Compute loss
