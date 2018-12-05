@@ -2,41 +2,45 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+CUDA = torch.cuda.is_available()
+
+
 def _inflate(tensor, times, dim):
-        """
-        Given a tensor, 'inflates' it along the given dimension by replicating each slice specified number of times (in-place)
+    """
+    Given a tensor, 'inflates' it along the given dimension by replicating each slice specified number of times (in-place)
 
-        Args:
-            tensor: A :class:`Tensor` to inflate
-            times: number of repetitions
-            dim: axis for inflation (default=0)
+    Args:
+        tensor: A :class:`Tensor` to inflate
+        times: number of repetitions
+        dim: axis for inflation (default=0)
 
-        Returns:
-            A :class:`Tensor`
+    Returns:
+        A :class:`Tensor`
 
-        Examples::
-            >> a = torch.LongTensor([[1, 2], [3, 4]])
-            >> a
-            1   2
-            3   4
-            [torch.LongTensor of size 2x2]
-            >> b = ._inflate(a, 2, dim=1)
-            >> b
-            1   2   1   2
-            3   4   3   4
-            [torch.LongTensor of size 2x4]
-            >> c = _inflate(a, 2, dim=0)
-            >> c
-            1   2
-            3   4
-            1   2
-            3   4
-            [torch.LongTensor of size 4x2]
+    Examples::
+        >> a = torch.LongTensor([[1, 2], [3, 4]])
+        >> a
+        1   2
+        3   4
+        [torch.LongTensor of size 2x2]
+        >> b = ._inflate(a, 2, dim=1)
+        >> b
+        1   2   1   2
+        3   4   3   4
+        [torch.LongTensor of size 2x4]
+        >> c = _inflate(a, 2, dim=0)
+        >> c
+        1   2
+        3   4
+        1   2
+        3   4
+        [torch.LongTensor of size 4x2]
 
-        """
-        repeat_dims = [1] * tensor.dim()
-        repeat_dims[dim] = times
-        return tensor.repeat(*repeat_dims)
+    """
+    repeat_dims = [1] * tensor.dim()
+    repeat_dims[dim] = times
+    return tensor.repeat(*repeat_dims)
+
 
 class TopKDecoder(torch.nn.Module):
     r"""
@@ -81,7 +85,7 @@ class TopKDecoder(torch.nn.Module):
         self.EOS = self.rnn.eos_id
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax,
-                    teacher_forcing_ratio=0, retain_output_probs=True):
+                teacher_forcing_ratio=0, retain_output_probs=True):
         """
         Forward rnn for MAX_LENGTH steps.  Look at :func:`seq2seq.models.DecoderRNN.DecoderRNN.forward_rnn` for details.
         """
@@ -116,6 +120,10 @@ class TopKDecoder(torch.nn.Module):
 
         # Initialize the input vector
         input_var = Variable(torch.transpose(torch.LongTensor([[self.SOS] * batch_size * self.k]), 0, 1))
+        if CUDA:
+            self.pos_index = self.pos_index.cuda()
+            input_var = input_var.cuda()
+            sequence_scores = sequence_scores.cuda()
 
         # Store decisions for backtracking
         stored_outputs = list()
@@ -223,11 +231,17 @@ class TopKDecoder(torch.nn.Module):
         # the last hidden state of decoding.
         if lstm:
             state_size = nw_hidden[0][0].size()
-            h_n = tuple([torch.zeros(state_size), torch.zeros(state_size)])
+            if CUDA:
+                h_n = tuple([torch.zeros(state_size).cuda(), torch.zeros(state_size).cuda()])
+            else:
+                h_n = tuple([torch.zeros(state_size), torch.zeros(state_size)])
         else:
             h_n = torch.zeros(nw_hidden[0].size())
+            if CUDA:
+                h_n = h_n.cuda()
+
         l = [[self.rnn.max_length] * self.k for _ in range(b)]  # Placeholder for lengths of top-k sequences
-                                                                # Similar to `h_n`
+        # Similar to `h_n`
 
         # the last step output of the beams are not sorted
         # thus they are sorted here
@@ -235,8 +249,8 @@ class TopKDecoder(torch.nn.Module):
         # initialize the sequence scores with the sorted last step beam scores
         s = sorted_score.clone()
 
-        batch_eos_found = [0] * b   # the number of EOS found
-                                    # in the backward loop below for each batch
+        batch_eos_found = [0] * b  # the number of EOS found
+        # in the backward loop below for each batch
 
         t = self.rnn.max_length - 1
         # initialize the back pointer with the sorted order of the last step beams.
@@ -273,7 +287,7 @@ class TopKDecoder(torch.nn.Module):
             #
             eos_indices = symbols[t].data.squeeze(1).eq(self.EOS).nonzero()
             if eos_indices.dim() > 0:
-                for i in range(eos_indices.size(0)-1, -1, -1):
+                for i in range(eos_indices.size(0) - 1, -1, -1):
                     # Indices of the EOS symbol for both variables
                     # with b*k as the first dimension, and b, k for
                     # the first two dimensions
@@ -312,7 +326,7 @@ class TopKDecoder(torch.nn.Module):
         # the order (very unlikely)
         s, re_sorted_idx = s.topk(self.k)
         for b_idx in range(b):
-            l[b_idx] = [l[b_idx][k_idx.item()] for k_idx in re_sorted_idx[b_idx,:]]
+            l[b_idx] = [l[b_idx][k_idx.item()] for k_idx in re_sorted_idx[b_idx, :]]
 
         re_sorted_idx = (re_sorted_idx + self.pos_index.expand_as(re_sorted_idx)).view(b * self.k)
 
@@ -321,7 +335,8 @@ class TopKDecoder(torch.nn.Module):
         output = [step.index_select(0, re_sorted_idx).view(b, self.k, -1) for step in reversed(output)]
         p = [step.index_select(0, re_sorted_idx).view(b, self.k, -1) for step in reversed(p)]
         if lstm:
-            h_t = [tuple([h.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size) for h in step]) for step in reversed(h_t)]
+            h_t = [tuple([h.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size) for h in step]) for step in
+                   reversed(h_t)]
             h_n = tuple([h.index_select(1, re_sorted_idx.data).view(-1, b, self.k, hidden_size) for h in h_n])
         else:
             h_t = [step.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size) for step in reversed(h_t)]
@@ -331,7 +346,7 @@ class TopKDecoder(torch.nn.Module):
         return output, h_t, h_n, s, l, p
 
     def _mask_symbol_scores(self, score, idx, masking_score=-float('inf')):
-            score[idx] = masking_score
+        score[idx] = masking_score
 
     def _mask(self, tensor, idx, dim=0, masking_score=-float('inf')):
         if len(idx.size()) > 0:
