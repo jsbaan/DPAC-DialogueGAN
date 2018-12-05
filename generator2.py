@@ -29,10 +29,9 @@ class Generator2(nn.Module):
         self.seq2seq = Seq2seq(self.encoder, self.beam_decoder)
 
     def forward(self, src, tgt):
-        # outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
-        outputs, _, _ = self.seq2seq(src, target_variable=None, teacher_forcing_ratio=0)
+        outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
 
-        start_tokens = torch.zeros(64, self.vocab_size)
+        start_tokens = torch.zeros(64, self.vocab_size, device=outputs[0].device)
         start_tokens[5,:] = 1
 
         outputs = [start_tokens] + outputs
