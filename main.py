@@ -15,18 +15,11 @@
     # Hierarchical decoder to generate multiple sentences
 
 from __future__ import print_function
-from math import ceil
-import numpy as np
-import sys
-import pdb
 
-import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
-from torch.nn import functional as F
 
-import generator
 import discriminator
 import discriminator_LM
 from helpers import *
@@ -34,7 +27,8 @@ from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
-import time
+
+from generator2 import Generator2
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
@@ -74,6 +68,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             reply = reply.permute(1,0).to(DEVICE)
 
             output = gen.forward(context, reply)
+
 
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE).to(DEVICE)
@@ -208,7 +203,7 @@ if __name__ == '__main__':
         corpus = train_data_loader.dataset.corpus
 
     # Initalize Networks and optimizers
-    gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    gen = Generator2(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
