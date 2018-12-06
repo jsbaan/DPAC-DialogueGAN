@@ -9,4 +9,4 @@ class DPDataLoader(DataLoader):
 
         collator = dataset.corpus.get_collator(reply_length=20)
 
-        super().__init__(dataset, batch_size=batch_size, collate_fn=collator, shuffle=True)
+        super().__init__(dataset, batch_size=batch_size, collate_fn=collator, shuffle=True, drop_last=True)
