@@ -28,7 +28,6 @@ from torch.nn import functional as F
 import generator
 import discriminator
 import discriminator_LM
-import language_model
 from helpers import *
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
@@ -121,6 +120,27 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     gen_opt.step()
     return perplexity
 
+def fill_with_padding(sentences, u_token, pad_token):
+    """
+    Takes a batch of sentences with equal lengths as input. 
+    Returns same size of batch but with padding filling after the first 
+    end of utterence token.
+    """
+
+    for i in range(sentences.size(0)):
+        sent = sentences[i]
+        idx = (sent == u_token).nonzero()
+        if len(idx) > 0:    
+            idx = idx[0].item()
+            split = torch.split(sent, idx+1)[0]
+            padding = pad_token * torch.ones(sentences.size(1) - len(split))
+            pad_sent = torch.cat((split, padding))
+            sentences[i][:] = pad_sent
+
+    return sentences
+
+
+
 
 def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
     """
@@ -130,9 +150,11 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # Batchsize is 32
     # context is 32 x max_context_size
 
-    # torch.nn.utils.clip_grad_norm(discriminator.parameters(), max_norm=5.0)
 
     fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+
+    fake_reply = fill_with_padding(fake_reply, corpus.token_to_id('</u>'), corpus.token_to_id('<pad>'))
+
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
 
@@ -180,16 +202,6 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
 
     loss.backward()
     dis_opt.step()
-
-def train_language_model(lm, optimizer, data, epochs):
-    pad_token = data.dataset.corpus.token_to_id('<pad>')
-    loss_per_epoch = []
-    for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
-        total_loss = 0
-        losses = []
-        for(iter, (context, reply)) in enumerate(train_data_loader):
-            optimizer.zero_grad()
 
 
 
@@ -245,13 +257,7 @@ if __name__ == '__main__':
             print('\n Pretraining Discriminator: ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
 
-
-    # # Train Language Model
-    # print('\nStarting LM Training...')
-    # for epoch in range(ADV_TRAIN_EPOCHS):
-    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-    #     for (batch, (context, reply)) in enumerate(train_data_loader):
-    #         train_language_model(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)
+l(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)
 
 
     # # ADVERSARIAL TRAINING

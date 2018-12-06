@@ -3,6 +3,8 @@ import torch.autograd as autograd
 import torch.nn as nn
 import pdb
 import numpy as np
+import sys
+
 
 class Discriminator(nn.Module):
 
@@ -37,7 +39,7 @@ class Discriminator(nn.Module):
         out = torch.tanh(out)
         out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        # out = torch.softmax(out, dim=1)
+        out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
@@ -71,13 +73,16 @@ class Discriminator(nn.Module):
 
     def get_rewards(self, reply):
         batch_size, max_seq_len = reply.shape
-        criterion = nn.CrossEntropyLoss(reduction="none")
+        # criterion = nn.CrossEntropyLoss(reduction="none")
         rewards = torch.zeros(batch_size, max_seq_len-1)
         for t in range(max_seq_len-1): ## CANNOT PREDICT NEXT WORD FOR LAST ONE
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
-            next_word = self.batchClassify(inp.long())
-            rewards[:, t] = -criterion(next_word, target.long().to(self.device))
+            output = self.batchClassify(inp.long())
+            reward = output.gather(1, target.type(torch.LongTensor).unsqueeze(1))
+
+            # rewards[:, t] = -criterion(next_word, target.long().to(self.device))
+            rewards[:, t] = torch.log(reward.squeeze())
 
         return rewards
 
