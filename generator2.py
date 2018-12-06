@@ -17,8 +17,10 @@ class Generator2(nn.Module):
             beam_size=5,
             enc_n_layers=2,
             enc_dropout=0.2,
+            enc_bidirectional=True,
             dec_n_layers=2,
             dec_dropout=0.2,
+            dec_bidirectional=True,
             teacher_forcing_ratio=0.5):
         super(Generator2, self).__init__()
 
@@ -27,9 +29,9 @@ class Generator2(nn.Module):
         self.teacher_forcing_ratio = teacher_forcing_ratio
 
         self.encoder = EncoderRNN(vocab_size, max_len-1, hidden_size, 0, enc_dropout, enc_n_layers, True, 'gru', False, None)
-        self.decoder = DecoderRNN(vocab_size, max_len-1, hidden_size * 2, sos_id, eou_id, dec_n_layers, 'gru', True, 0, dec_dropout, True)
+        self.decoder = DecoderRNN(vocab_size, max_len-1, hidden_size*2 if dec_bidirectional else hidden_size, sos_id, eou_id, dec_n_layers, 'gru', dec_bidirectional, 0, dec_dropout, True)
         self.beam_decoder = TopKDecoder(self.decoder, beam_size)
-        self.seq2seq = Seq2seq(self.encoder, self.beam_decoder)
+        self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
     def forward(self, src, tgt):
         outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
