@@ -134,7 +134,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     gen_opt.step()
     return perplexity
 
-def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
+def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic, EOU):
     """
     Actor Critic Pseudocode:
 
@@ -156,8 +156,12 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
     encoder_output, hidden = gen.encoder(context)
     hidden = hidden[:gen.decoder.n_layers]
     input = torch.autograd.Variable(context.data[0, :])  # sos
+    # TODO initialize samples with padding tokens instead of zeros to prevent
+    # future padding
     samples = torch.autograd.Variable(torch.zeros(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
     samples[:,0] = input
+    active_ep_idx = torch.ones(BATCH_SIZE)
+    EOU = torch.tensor(EOU).repeat(BATCH_SIZE)
 
     # Pass through decoder and sample action (word) from resulting vocab distribution
     for t in range(1, MAX_SEQ_LEN):
@@ -166,67 +170,50 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic):
 
         # Sample action (token) for entire batch from predicted vocab distribution
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
-        state = samples[:,:t]
-        reward = dis.get_reward(state, action)
-        samples[:, t] = action
-        next_state = samples[:,:t+1]
-        # TODO fix done by checking for terminal states (in batch?how?)
-        done = None
         input = torch.autograd.Variable(action)
 
-        ## Train using AC without experience replay
-        if not USE_EXP_REPLAY:
+        # Check which episodes (sampled sentences) have not encountered a EOU token
+        done = action == EOU
+        active_ep_idx -= done.float()
+        active_ep_idx = (active_ep_idx > 0).long()
+
+        # Only put states of active episodes in replay memory
+        state = torch.gather(samples[:,:t], 0, active_ep_idx.unsqueeze(1))
+        reward = torch.gather(dis.get_reward(state, action).unsqueeze(1), 0, active_ep_idx.unsqueeze(1))
+        samples[:, t] = action
+        # TODO slice samples in such a way that the correct entries (episodes teacher_forcing_ratio
+        # have not encountered a EOU token yet) from the batch are selectedself.
+        # the length of each enty will vary according to t
+        next_state = torch.index_select(samples[:,:t+1], 0, active_ep_idx.unsqueeze(1))
+        done = torch.gather(done, 0, active_ep_idx.unsqueeze(1))
+
+        # TODO write push_batch in such a way that it adds the the entries seperately
+        # instead of a tuple of the entire batch of observations
+        memory.push_batch((state, action, reward, next_state, done))
+        if memory.__len__() > AC_WARMUP:
+            (state,action,reward,next_state,done) = memory.sample(BATCH_SIZE)
             q_values = critic.forward(state)
             with torch.no_grad():
                 mask = (done==False).float()
                 q_values_target = mask*(discount_factor * critic.forward(next_state)) + reward
 
-            critic_loss = F.smooth_l1_loss(cur_value, next_value)
+            # TODO which loss function to use
+            critic_loss = F.smooth_l1_loss(q_values, q_values_target)
 
-        ######## LAB CODE FOR ACTOR CRITIC
-        # # Compute value/critic loss
-        # cur_value = critic(state).squeeze(1)
-        # with torch.no_grad():
-        #     mask = (done==False).float()
-        #     next_value = mask*(discount_factor * critic(next_state).squeeze(1)) + reward
-        # value_loss = F.smooth_l1_loss(cur_value, next_value)
-        #
-        # # Compute actor loss
-        # v = reward + discount_factor * critic(next_state).squeeze(1)
-        # actor_loss = -torch.mean(log_ps * v.detach())
-        #
-        #
-        # # The loss is composed of the value_loss (for the critic) and the actor_loss
-        # loss = value_loss + actor_loss
-        #
-        # # backpropagation of loss to Neural Network (PyTorch magic)
-        # optimizer.zero_grad()
-        # loss.backward()
-        # optimizer.step()
+            # TODO we need to keep track of the action probabilities within
+            # the replay memory in order to compute the actor loss (log_ps)
+            v = reward + discount_factor * critic(next_state).squeeze(1)
+            actor_loss = -torch.mean(log_ps * v.detach())
 
-        #######
+            # The loss is composed of the value_loss (for the critic) and the actor_loss
+            loss = value_loss + actor_loss
 
+            # TODO should we have one optimizer for actor & critic? Or update both
+            # here at the same time?
+            gen_opt.zero_grad()
+            loss.backward()
+            gen_opt.step()
 
-
-            # Update actor (generator) --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
-            actor_loss =
-
-        ## Train using experience replay
-        elif USE_EXP_REPLAY:
-            # TODO decide when done should be true (first padding token generated?)
-            # TODO decide whether to put entire batch as one tuple or as seperate entries
-            # TODO decide whether padding the experience replay buffer makes sense
-            #       (would this solve the issue of variable length states?)
-
-            # Store (batch of) transition(s) in replay memory
-            done = False
-            memory.push_batch((state,action,reward,next_state,done))
-            if memory.__len__() > AC_WARMUP:
-                # Sample batch from replay memory
-                memory.sample(BATCH_SIZE)
-                # Update critic --> r + discount_facot * V(s') - V(s)   NOTE: target with no grad!
-                # update actor --> torch.mean(V(s)) NOTE: not like policy gradient, but according to Deepmind DDPG
-    quit()
     return
 
 def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
@@ -350,6 +337,7 @@ if __name__ == '__main__':
 
     # ADVERSARIAL TRAINING
     print('\nStarting Adversarial Training...')
+    EOU = train_data_loader.dataset.corpus.token_to_id(DPCorpus.EOU)
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         sys.stdout.flush()
@@ -358,7 +346,7 @@ if __name__ == '__main__':
             print('\nAdversarial Training Generator: ')
             # perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
             perplexity = train_generator_PGAC(context.permute(1,0), reply.permute(1,0),\
-                gen, gen_optimizer, dis, memory, critic)
+                gen, gen_optimizer, dis, memory, critic,EOU)
             if batch % 10 == 0:
                 print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
