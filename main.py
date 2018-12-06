@@ -28,20 +28,20 @@ from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
 
-from generator2 import Generator2
+from generator import Generator
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
-VOCAB_SIZE = 5000
+VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 50
+MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
 
-GEN_EMBEDDING_DIM = 128
+GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
@@ -67,8 +67,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             context = context.permute(1,0).to(DEVICE)
             reply = reply.permute(1,0).to(DEVICE)
 
-            output = gen.forward(context.t().to(DEVICE), reply.t().to(DEVICE))
-
+            output = gen.forward(context, reply)
 
             # Compute loss
             pred_dist = output[1:].view(-1, VOCAB_SIZE).to(DEVICE)
@@ -205,7 +204,10 @@ if __name__ == '__main__':
     # Initalize Networks and optimizers
     sos_id = corpus.token_to_id(corpus.SOS)
     eou_id = corpus.token_to_id(corpus.EOU)
-    gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+
+    gen = Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    # gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
