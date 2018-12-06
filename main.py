@@ -93,10 +93,14 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                     'loss'      : losses,
                 },'generator_checkpoint{}.pth.tar'.format(epoch))
 
-                print("Generated reply")
-                print(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]]))
-                print("Real  reply")
-                print(corpus.ids_to_tokens([int(i) for i in reply[:,0]]))
+                try:
+                    print("Generated reply")
+                    print(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]]).encode('utf-8'))
+                    print("Real  reply")
+                    print(corpus.ids_to_tokens([int(i) for i in reply[:,0]]).encode('utf-8'))
+                except:
+                    print("Encoding Error")
+
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
     return losses
