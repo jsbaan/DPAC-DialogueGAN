@@ -16,8 +16,8 @@ class Generator(nn.Module):
         enc_dropout=0.2, dec_n_layers=2, dec_dropout=0.2, device='cpu'):
         super(Generator, self).__init__()
 
-        encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout, device=device)
-        decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout, device=device)
+        encoder = Encoder(vocab_size, embed_size, hidden_size, enc_n_layers, enc_dropout, device=device).to(device)
+        decoder = Decoder(embed_size, hidden_size, vocab_size, dec_n_layers, dec_dropout, device=device).to(device)
 
         self.max_len = max_len
         self.device = device

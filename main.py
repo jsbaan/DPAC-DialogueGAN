@@ -37,10 +37,12 @@ import os
 import time
 
 if torch.cuda.is_available():
-    DEVICE = torch.device('cuda:0')  #'
+    DEVICE = torch.device('cuda:0') 
+    print("RUNNIG ON CUDA") #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
-CUDA = False
+    print("RUNNING ON CPU")
+CUDA = True
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
@@ -177,7 +179,6 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     dis_opt.step()
 
 
-
 # MAIN
 if __name__ == '__main__':
     # Load data set
@@ -201,7 +202,6 @@ if __name__ == '__main__':
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
     gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
-
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
     else:

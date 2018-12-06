@@ -75,7 +75,7 @@ class Decoder(nn.Module):
         embedded = self.dropout(embedded)
 
         # Calculate attention weights and apply to encoder outputs
-        attn_weights = self.attention(last_hidden[-1], encoder_outputs)
+        attn_weights = self.attention(last_hidden[-1], encoder_outputs).to(self.device)
         context = attn_weights.bmm(encoder_outputs.transpose(0, 1))  # (B,1,N)
         context = context.transpose(0, 1)  # (1,B,N)
 
