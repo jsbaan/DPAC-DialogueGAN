@@ -95,11 +95,11 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
                 try:
                     print("Generated reply")
-                    print(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]]).encode('utf-8'))
+                    print(' '.join(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]])))
                     print("Real  reply")
-                    print(corpus.ids_to_tokens([int(i) for i in reply[:,0]]).encode('utf-8'))
+                    print(' '.join(corpus.ids_to_tokens([int(i) for i in reply[:,0]])))
                 except:
-                    print("Encoding Error")
+                    print("Unable to print")
 
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
