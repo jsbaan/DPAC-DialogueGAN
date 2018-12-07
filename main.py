@@ -48,6 +48,28 @@ DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = True
 
+def try_get_state_dicts(directory='./', prefix='generator_checkpoint', postfix='.pth.tar'):
+    files = os.listdir(directory)
+    files = [f for f in files if f.startswith(prefix)]
+    files = [f for f in files if f.endswith(postfix)]
+
+    epoch_nums = []
+    for file in files:
+        number = file[len(prefix):-len(postfix)]
+        try:
+            epoch_nums.append(int(number))
+        except:
+            pass
+
+    if len(epoch_nums) < 2:
+        return None
+
+    last_complete_epoch = sorted(epoch_nums)[-2]
+    filename = prefix + str(last_complete_epoch) + postfix
+
+    data = torch.load(filename)
+    return data
+
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
     corpus = data.dataset.corpus
@@ -56,8 +78,15 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
     loss_func.to(DEVICE)
 
+    start_epoch = 0
+    saved_data = try_get_state_dicts()
+    if saved_data is not None:
+        start_epoch = saved_data['epoch']
+        gen.load_state_dict(saved_data['state_dict'])
+        optimizer.load_state_dict(saved_data['optimizer'])
+
     loss_per_epoch = []
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         print('epoch %d : ' % (epoch + 1))
 
         total_loss = 0
