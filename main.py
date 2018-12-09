@@ -36,20 +36,42 @@ import os
 import time
 
 DEVICE = torch.device('cpu')  #'cpu'
-VOCAB_SIZE = 5000
+VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 50
-LM_TRAIN_EPOCHS = 20
 
-GEN_EMBEDDING_DIM = 32
-GEN_HIDDEN_DIM = 32
+
+GEN_EMBEDDING_DIM = 256
+GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
 MC = False
+
+def try_get_state_dicts(directory='./', prefix='generator_checkpoint', postfix='.pth.tar'):
+    files = os.listdir(directory)
+    files = [f for f in files if f.startswith(prefix)]
+    files = [f for f in files if f.endswith(postfix)]
+
+    epoch_nums = []
+    for file in files:
+        number = file[len(prefix):-len(postfix)]
+        try:
+            epoch_nums.append(int(number))
+        except:
+            pass
+
+    if len(epoch_nums) < 2:
+        return None
+
+    last_complete_epoch = sorted(epoch_nums)[-2]
+    filename = prefix + str(last_complete_epoch) + postfix
+
+    data = torch.load(filename)
+    return data
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -159,10 +181,10 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
 
     # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
-    # print("Fake generated reply")
-    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-    # print("Real  reply")
-    # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+    print("Fake generated reply")
+    print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    print("Real  reply")
+    print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
     # print(30 * "-")
     if DISCRIMINATOR_LM:
         # print("Generated reply")
@@ -228,7 +250,11 @@ if __name__ == '__main__':
 
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
+    # gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
+
+    # initialize generator
+    saved_data = try_get_state_dicts()
+    gen.load_state_dict(saved_data['state_dict'])
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
@@ -239,9 +265,6 @@ if __name__ == '__main__':
     dis = dis.to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
-    lm = language_model.LM(DIS_HIDDEN_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    lm = lm.to(DEVICE)
-    lm_optimizer = optim.Adagrad(lm.parameters())
 
 
     # OPTIONAL: Pretrain generator
@@ -256,8 +279,6 @@ if __name__ == '__main__':
         for (batch, (context, reply)) in enumerate(train_data_loader):
             print('\n Pretraining Discriminator: ')
             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-
-l(lm, lm_optimizer, train_data_loader, LM_TRAIN_EPOCHS)
 
 
     # # ADVERSARIAL TRAINING
