@@ -38,7 +38,7 @@ VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 100
+MLE_TRAIN_EPOCHS = 150
 ADV_TRAIN_EPOCHS = 50
 
 GEN_EMBEDDING_DIM = 256
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     gen = gen.to(DEVICE)
 
     dis_optimizer = optim.Adagrad(dis.parameters())  ## ADAGRAD ??
-    gen_optimizer = optim.Adam(gen.parameters(), lr=2e-3)
+    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-3)
 
     # OPTIONAL: Pretrain generator
     # checkpoint = torch.load('generator_checkpoint.pth.tar')
