@@ -43,25 +43,25 @@ if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
-
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 50
+MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-LM_TRAIN_EPOCHS = 20
 
-GEN_EMBEDDING_DIM = 32
-GEN_HIDDEN_DIM = 32
+GEN_EMBEDDING_DIM = 128
+GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
+
 MC = False
 USE_EXP_REPLAY = False
 CAPACITY_RM = 100000
 PRETRAIN = False
 DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
 AC_WARMUP = 1000
+DISCOUNT_FACTOR = 0.99
 
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
@@ -173,40 +173,44 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic, EOU)
         input = torch.autograd.Variable(action)
 
         # Check which episodes (sampled sentences) have not encountered a EOU token
-        done = action == EOU
-        active_ep_idx -= done.float()
-        active_ep_idx = (active_ep_idx > 0).long()
+        done = (action == EOU).float()
+
+        active_index = (active_ep_idx!= 0).nonzero().squeeze(1)
 
         # Only put states of active episodes in replay memory
-        state = torch.gather(samples[:,:t], 0, active_ep_idx.unsqueeze(1))
-        reward = torch.gather(dis.get_reward(state, action).unsqueeze(1), 0, active_ep_idx.unsqueeze(1))
+        state = samples[active_index, :t] #torch.gather(samples[:,:t], 0, active_ep_idx.unsqueeze(1))
+        action_active = action[active_index]
+        reward = dis.get_reward(state, action_active)
         samples[:, t] = action
-        # TODO slice samples in such a way that the correct entries (episodes teacher_forcing_ratio
-        # have not encountered a EOU token yet) from the batch are selectedself.
-        # the length of each enty will vary according to t
-        next_state = torch.index_select(samples[:,:t+1], 0, active_ep_idx.unsqueeze(1))
-        done = torch.gather(done, 0, active_ep_idx.unsqueeze(1))
+        next_state = samples[active_index, :t+1]
+        done_index = (done != 0).nonzero()
+        active_ep_idx[done_index] = 0
+        for i in range(len(active_index)):
+            state_padded = torch.zeros(MAX_SEQ_LEN)
+            next_state_padded = torch.zeros(MAX_SEQ_LEN)
+            state_padded[:len(state[i])] = state[i]
+            next_state_padded[:len(next_state[i])] = next_state[i]
+            memory.push((state_padded, action_active[i], reward[i], next_state_padded, done[i]))
 
-        # TODO write push_batch in such a way that it adds the the entries seperately
-        # instead of a tuple of the entire batch of observations
-        memory.push_batch((state, action, reward, next_state, done))
         if memory.__len__() > AC_WARMUP:
-            (state,action,reward,next_state,done) = memory.sample(BATCH_SIZE)
-            q_values = critic.forward(state)
+            info = tuple(zip(*memory.sample(BATCH_SIZE)))
+            ## Fix that state have same dimensions, ADD PADDING
+            state, action, reward, next_state, done = [torch.stack(i) for i in info]
+
+            q_values = critic.forward(state.long())[np.arange(BATCH_SIZE), action]
             with torch.no_grad():
                 mask = (done==False).float()
-                q_values_target = mask*(discount_factor * critic.forward(next_state)) + reward
-
+                q_values_target = mask.float()*(DISCOUNT_FACTOR * torch.argmax(critic.forward(next_state.long()), dim=1).float()) + reward
             # TODO which loss function to use
             critic_loss = F.smooth_l1_loss(q_values, q_values_target)
 
             # TODO we need to keep track of the action probabilities within
-            # the replay memory in order to compute the actor loss (log_ps)
-            v = reward + discount_factor * critic(next_state).squeeze(1)
-            actor_loss = -torch.mean(log_ps * v.detach())
-
+            # the replay memory in order to compute the actor loss (log_ps) 
+            # v = reward + discount_factor * critic(next_state).squeeze(1)
+            actor_loss = -torch.mean(q_values) ## DO WE REALLY NEED log ps?
+            print(actor_loss)
             # The loss is composed of the value_loss (for the critic) and the actor_loss
-            loss = value_loss + actor_loss
+            loss = critic_loss + actor_loss
 
             # TODO should we have one optimizer for actor & critic? Or update both
             # here at the same time?
@@ -237,10 +241,10 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
     # print(30 * "-")
     if DISCRIMINATOR_LM:
-        # print("Generated reply")
-        # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-        # print("Real  reply")
-        # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+        print("Generated reply")
+        print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+        print("Real  reply")
+        print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
         fake_rewards = torch.mean(dis.get_rewards(fake_reply), dim=1)
         real_rewards = torch.mean(dis.get_rewards(real_reply), dim=1)
@@ -322,7 +326,6 @@ if __name__ == '__main__':
 
     # OPTIONAL: Pretrain generator
     if PRETRAIN:
-        checkpoint = torch.load('generator_checkpoint.pth.tar')
         print('Starting Generator MLE Training...')
         train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
@@ -333,6 +336,10 @@ if __name__ == '__main__':
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 print('\n Pretraining Discriminator: ')
                 train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+    checkpoint = torch.load("generator_checkpoint49.pth.tar", map_location='cpu')
+    state_dict = checkpoint['state_dict']
+    gen.load_state_dict(state_dict)
+
 
 
     # ADVERSARIAL TRAINING

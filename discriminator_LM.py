@@ -37,7 +37,6 @@ class Discriminator(nn.Module):
         out = torch.tanh(out)
         out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
-        # out = torch.softmax(out, dim=1)
         return out
 
     def batchClassify(self, response):
@@ -87,7 +86,11 @@ class Discriminator(nn.Module):
         """
         criterion = nn.CrossEntropyLoss(reduction="none")
         output = self.batchClassify(history.long())
-        reward = -criterion(output, word.long().to(self.device))
+        output = torch.softmax(output, dim=1)
+
+        reward = output[np.arange(len(output)), word] # I think this is te reward?
+
+        #reward = criterion(output, word.long().to(self.device)) ## MINUS ??
         return reward
 
 
