@@ -44,7 +44,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 100
-DIS_TRAIN_EPOCHS = 100
+DIS_TRAIN_EPOCHS = 1
 
 
 GEN_EMBEDDING_DIM = 256
@@ -196,6 +196,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                     print("real reward ", torch.mean(real_rewards).item())
                 except:
                     print("Unable to print")
+
+            break
 
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "discriminator_final_loss.pth.tar")
