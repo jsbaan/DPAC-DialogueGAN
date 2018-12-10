@@ -80,7 +80,7 @@ class Discriminator(nn.Module):
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
             output = self.batchClassify(inp.long())
-            reward = output.gather(1, target.type(torch.LongTensor).unsqueeze(1))
+            reward = output.gather(1, target.type(torch.LongTensor).unsqueeze(1).to(DEVICE))
 
             mask = torch.zeros(batch_size)
             for i in range(batch_size):   
