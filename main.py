@@ -44,7 +44,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 2
 ADV_TRAIN_EPOCHS = 100
-DIS_TRAIN_EPOCHS = 1
+DIS_TRAIN_EPOCHS = 50
 
 
 GEN_EMBEDDING_DIM = 256
@@ -175,8 +175,7 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
             losses.append(loss)
 
             # print updates
-            # if iter % 50 == 0 and iter != 0:
-            if iter % 50 == 0:
+            if iter % 50 == 0 and iter != 0:
                 print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
@@ -197,7 +196,6 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                 except:
                     print("Unable to print")
 
-            break
 
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "discriminator_final_loss.pth.tar")
