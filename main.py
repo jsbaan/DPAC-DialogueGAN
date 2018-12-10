@@ -110,11 +110,11 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
     ud_id = corpus.token_to_id('</u>')
 
     start_epoch = 0
-    saved_dis = try_get_state_dicts(prefix='discriminator_checkpoint') 
-    if saved_dis is not None:
-        start_epoch = saved_dis['epoch']
-        discriminator.load_state_dict(saved_dis['state_dict'])
-        dis_opt.load_state_dict(saved_dis['optimizer'])
+    # saved_dis = try_get_state_dicts(prefix='discriminator_checkpoint') 
+    # if saved_dis is not None:
+    #     start_epoch = saved_dis['epoch']
+    #     discriminator.load_state_dict(saved_dis['state_dict'])
+    #     dis_opt.load_state_dict(saved_dis['optimizer'])
 
     loss_per_epoch = []
 
@@ -137,13 +137,13 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
                 loss = -torch.mean((real_rewards - fake_rewards))
 
-                print("Fake generated reply")
-                print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-                print("Real  reply")
-                print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+                # print("Fake generated reply")
+                # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+                # print("Real  reply")
+                # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
-                print("fake reward ", torch.mean(fake_rewards).item())
-                print("real reward ", torch.mean(real_rewards).item())
+                # print("fake reward ", torch.mean(fake_rewards).item())
+                # print("real reward ", torch.mean(real_rewards).item())
 
 
             else:
@@ -175,7 +175,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
             losses.append(loss)
 
             # print updates
-            if iter % 50 == 0 and iter != 0:
+            # if iter % 50 == 0 and iter != 0:
+            if iter % 50 == 0:
                 print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
