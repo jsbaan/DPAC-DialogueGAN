@@ -71,18 +71,26 @@ class Discriminator(nn.Module):
         out = self.forward(inp, h)
         return loss_fn(out, target)
 
-    def get_rewards(self, reply):
+    def get_rewards(self, reply, ignore_index):
         batch_size, max_seq_len = reply.shape
-        # criterion = nn.CrossEntropyLoss(reduction="none")
+        # criterion = nn.CrossEntropyLoss(reduction="none", ignore_index=ignore_index)
         rewards = torch.zeros(batch_size, max_seq_len-1)
+
         for t in range(max_seq_len-1): ## CANNOT PREDICT NEXT WORD FOR LAST ONE
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
             output = self.batchClassify(inp.long())
             reward = output.gather(1, target.type(torch.LongTensor).unsqueeze(1))
 
-            # rewards[:, t] = -criterion(next_word, target.long().to(self.device))
-            rewards[:, t] = torch.log(reward.squeeze())
+            mask = torch.zeros(batch_size)
+            for i in range(batch_size):   
+                if target[i].item() != ignore_index:
+                    mask[i] = 1.0
+                else:
+                    break
+
+            # rewards[:, t] = -criterion(output, target.long().to(self.device)) 
+            rewards[:, t] = torch.log(reward.squeeze()) * mask      
 
         return rewards
 
