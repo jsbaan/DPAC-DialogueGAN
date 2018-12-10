@@ -136,6 +136,15 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
                 loss = -torch.mean((real_rewards - fake_rewards))
 
+                print("Fake generated reply")
+                print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+                print("Real  reply")
+                print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+
+                print("fake reward ", torch.mean(fake_rewards).item())
+                print("real reward ", torch.mean(real_rewards).item())
+
+
             else:
                 fake_targets = torch.zeros(BATCH_SIZE)
                 real_targets = torch.ones(BATCH_SIZE)
@@ -195,6 +204,10 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
 # MAIN
 if __name__ == '__main__':
+
+    # Do we have enough arguments?
+    assert len(sys.argv) == 2, "You should pass file name of pretrained generator as argument" 
+
     # Load data set
     if not os.path.isfile("dataset.pickle"):
         print("Saving the data set")
@@ -213,12 +226,16 @@ if __name__ == '__main__':
             train_data_loader= pickle.load(handle)
         corpus = train_data_loader.dataset.corpus
 
+
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
     # gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
 
     # initialize generator
-    saved_data = try_get_state_dicts()
+    # saved_data = try_get_state_dicts()
+    # gen.load_state_dict(saved_data['state_dict'])
+
+    saved_data = torch.load(sys.argv[1])
     gen.load_state_dict(saved_data['state_dict'])
 
     if DISCRIMINATOR_LM:
