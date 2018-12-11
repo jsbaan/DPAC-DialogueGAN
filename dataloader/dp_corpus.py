@@ -97,5 +97,5 @@ class DPCorpus(object):
         dialogs_ids = self.dialogs_to_ids(dialogs)
         return DPDataset(self, dialogs_ids, context_size, min_reply_length, max_reply_length)
 
-    def get_collator(self):
-        return DPCollator(self.token_ids[self.PAD])
+    def get_collator(self, reply_length = None):
+        return DPCollator(self.token_ids[self.PAD], reply_length=reply_length)

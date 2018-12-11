@@ -15,18 +15,11 @@
     # Hierarchical decoder to generate multiple sentences
 
 from __future__ import print_function
-from math import ceil
-import numpy as np
-import sys
-import pdb
 
-import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
-from torch.nn import functional as F
 
-import generator
 import discriminator
 import discriminator_LM
 import critic
@@ -39,20 +32,23 @@ import os
 import time
 import replay_memory
 
+from generator import Generator
+from generator2 import Generator2
+
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')
     print("RUNNIG ON CUDA") #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
     print("RUNNING ON CPU")
-VOCAB_SIZE = 5000
+VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
 
-GEN_EMBEDDING_DIM = 128
+GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
@@ -68,27 +64,60 @@ MC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 
+def try_get_state_dicts(directory='./', prefix='generator_checkpoint', postfix='.pth.tar'):
+    files = os.listdir(directory)
+    files = [f for f in files if f.startswith(prefix)]
+    files = [f for f in files if f.endswith(postfix)]
+
+    epoch_nums = []
+    for file in files:
+        number = file[len(prefix):-len(postfix)]
+        try:
+            epoch_nums.append(int(number))
+        except:
+            pass
+
+    if len(epoch_nums) < 2:
+        return None
+
+    last_complete_epoch = sorted(epoch_nums)[-2]
+    filename = prefix + str(last_complete_epoch) + postfix
+
+    data = torch.load(filename)
+    return data
+
 def train_generator_MLE(gen, optimizer, data, epochs):
     # Max Likelihood Pretraining for the generator
-    pad_token = data.dataset.corpus.token_to_id('<pad>')
+    corpus = data.dataset.corpus
+    pad_id = corpus.token_to_id(corpus.PAD)
+
+    loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
+    loss_func.to(DEVICE)
+
+    start_epoch = 0
+    # saved_data = try_get_state_dicts()
+    # if saved_data is not None:
+    #     start_epoch = saved_data['epoch']
+    #     gen.load_state_dict(saved_data['state_dict'])
+    #     optimizer.load_state_dict(saved_data['optimizer'])
+
     loss_per_epoch = []
-    for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
-        sys.stdout.flush()
+    for epoch in range(start_epoch, epochs):
+        print('epoch %d : ' % (epoch + 1))
+
         total_loss = 0
         losses = []
         for (iter, (context, reply)) in enumerate(train_data_loader):
-            print('Epoch {} Iter {}'.format(epoch+1,iter))
             optimizer.zero_grad()
             context = context.permute(1,0)
             reply = reply.permute(1,0)
             output = gen.forward(context, reply)
 
             # Compute loss
-            pred_dist = output[1:].view(-1, VOCAB_SIZE)
-            tgt_tokens = reply[1:].contiguous().view(-1)
+            pred_dist = output[1:].view(-1, VOCAB_SIZE).to(DEVICE)
+            tgt_tokens = reply[1:].contiguous().view(-1).to(DEVICE)
 
-            loss = F.nll_loss(pred_dist, tgt_tokens, ignore_index=pad_token)
+            loss = loss_func(pred_dist, tgt_tokens)
 
             # Backpropagate loss
             loss.backward()
@@ -99,7 +128,7 @@ def train_generator_MLE(gen, optimizer, data, epochs):
 
             # Print updates
             if iter % 50 == 0 and iter != 0:
-                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss//50))
+                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
                     'epoch': epoch+1,
@@ -107,6 +136,15 @@ def train_generator_MLE(gen, optimizer, data, epochs):
                     'optimizer' : optimizer.state_dict(),
                     'loss'      : losses,
                 },'generator_checkpoint{}.pth.tar'.format(epoch))
+
+                try:
+                    print("Generated reply")
+                    print(' '.join(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]])))
+                    print("Real  reply")
+                    print(' '.join(corpus.ids_to_tokens([int(i) for i in reply[:,0]])))
+                except:
+                    print("Unable to print")
+
         loss_per_epoch.append(total_loss)
     torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
     return losses

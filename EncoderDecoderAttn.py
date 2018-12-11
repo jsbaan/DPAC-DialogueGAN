@@ -11,8 +11,8 @@ class Encoder(nn.Module):
     def __init__(self, input_size, embed_size, hidden_size,
                  n_layers=1, dropout=0.5):
         super(Encoder, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
+
+        self.vocab_size = vocab_size
         self.embed_size = embed_size
         self.embed = nn.Embedding(input_size, embed_size)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers,
@@ -112,7 +112,7 @@ class Seq2Seq(nn.Module):
             output = Variable(trg.data[t] if is_teacher else top1)#.to(self.device)
         return outputs
 
-def train(e, model, optimizer, train_iter, vocab_size, grad_clip, DE, EN,device='cpu'):
+def train(e, model, optimizer, train_iter, vocab_size, grad_clip, DE, EN):
     model.train()
     total_loss = 0
     pad = EN.vocab.stoi['<pad>']
