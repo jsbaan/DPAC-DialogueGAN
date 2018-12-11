@@ -55,11 +55,14 @@ GEN_HIDDEN_DIM = 256
 DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 
-MC = False
-USE_EXP_REPLAY = False
 CAPACITY_RM = 100000
 PRETRAIN = False
+ACTOR_CHECKPOINT = "generator_checkpoint49.pth.tar"
+GEN_MLE_LR = 1e-3
+ACTOR_LR = 1e-3
+CRITIC_LR = 1e-3
 DISCRIMINATOR_LM = True     # one of the two (DISCRIMINATOR_LM or MC) must be False
+MC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 
@@ -134,7 +137,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     gen_opt.step()
     return perplexity
 
-def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic, EOU):
+def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer, \
+        EOU,PAD):
     """
     Actor Critic Pseudocode:
 
@@ -156,9 +160,7 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic, EOU)
     encoder_output, hidden = gen.encoder(context)
     hidden = hidden[:gen.decoder.n_layers]
     input = torch.autograd.Variable(context.data[0, :])  # sos
-    # TODO initialize samples with padding tokens instead of zeros to prevent
-    # future padding
-    samples = torch.autograd.Variable(torch.zeros(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
+    samples = torch.autograd.Variable(PAD*torch.ones(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
     samples[:,0] = input
     active_ep_idx = torch.ones(BATCH_SIZE)
     EOU = torch.tensor(EOU).repeat(BATCH_SIZE)
@@ -169,55 +171,45 @@ def train_generator_PGAC(context, reply, gen, gen_opt, dis, memory, critic, EOU)
                 input, hidden, encoder_output)
 
         # Sample action (token) for entire batch from predicted vocab distribution
+        # and set input for next forward pass
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
         input = torch.autograd.Variable(action)
 
         # Check which episodes (sampled sentences) have not encountered a EOU token
         done = (action == EOU).float()
-
-        active_index = (active_ep_idx!= 0).nonzero().squeeze(1)
+        active_index = active_ep_idx.nonzero().squeeze(1)
 
         # Only put states of active episodes in replay memory
-        state = samples[active_index, :t] #torch.gather(samples[:,:t], 0, active_ep_idx.unsqueeze(1))
-        action_active = action[active_index]
-        reward = dis.get_reward(state, action_active)
+        old_state = samples.clone()
+        reward = dis.get_reward(samples[active_index,:t], action[active_index])
         samples[:, t] = action
-        next_state = samples[active_index, :t+1]
-        done_index = (done != 0).nonzero()
+        done_index = done.nonzero()
         active_ep_idx[done_index] = 0
-        for i in range(len(active_index)):
-            state_padded = torch.zeros(MAX_SEQ_LEN)
-            next_state_padded = torch.zeros(MAX_SEQ_LEN)
-            state_padded[:len(state[i])] = state[i]
-            next_state_padded[:len(next_state[i])] = next_state[i]
-            memory.push((state_padded, action_active[i], reward[i], next_state_padded, done[i]))
+
+        for j,i in enumerate(active_index):
+            memory.push((old_state[i,:], action[i], reward[j], samples[i,:], done[i]))
 
         if memory.__len__() > AC_WARMUP:
+            # Retrieve batch from replay memory
             info = tuple(zip(*memory.sample(BATCH_SIZE)))
-            ## Fix that state have same dimensions, ADD PADDING
             state, action, reward, next_state, done = [torch.stack(i) for i in info]
 
+            # Estimate state-action values for each state in batch using critic
             q_values = critic.forward(state.long())[np.arange(BATCH_SIZE), action]
             with torch.no_grad():
                 mask = (done==False).float()
-                q_values_target = mask.float()*(DISCOUNT_FACTOR * torch.argmax(critic.forward(next_state.long()), dim=1).float()) + reward
-            # TODO which loss function to use
+                q_values_target = mask.float()*(DISCOUNT_FACTOR * \
+                    torch.max(critic.forward(next_state.long()), dim=1)[0].float()) \
+                    + reward
+
+            # TODO add rho importance sampling
+            # Compute combined actor critic loss and backprop
+            actor_loss = -torch.mean(q_values)
             critic_loss = F.smooth_l1_loss(q_values, q_values_target)
-
-            # TODO we need to keep track of the action probabilities within
-            # the replay memory in order to compute the actor loss (log_ps) 
-            # v = reward + discount_factor * critic(next_state).squeeze(1)
-            actor_loss = -torch.mean(q_values) ## DO WE REALLY NEED log ps?
-            print(actor_loss)
-            # The loss is composed of the value_loss (for the critic) and the actor_loss
-            loss = critic_loss + actor_loss
-
-            # TODO should we have one optimizer for actor & critic? Or update both
-            # here at the same time?
-            gen_opt.zero_grad()
+            loss = actor_loss + critic_loss
+            AC_optimizer.zero_grad()
             loss.backward()
-            gen_opt.step()
-
+            AC_optimizer.step()
     return
 
 def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
@@ -241,15 +233,15 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
     # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
     # print(30 * "-")
     if DISCRIMINATOR_LM:
-        print("Generated reply")
-        print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-        print("Real  reply")
-        print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+        # print("Generated reply")
+        # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+        # print("Real  reply")
+        # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
         fake_rewards = torch.mean(dis.get_rewards(fake_reply), dim=1)
         real_rewards = torch.mean(dis.get_rewards(real_reply), dim=1)
-        print("fake reward ", torch.mean(fake_rewards).item())
-        print("real reward ", torch.mean(real_rewards).item())
+        # print("fake reward ", torch.mean(fake_rewards).item())
+        # print("real reward ", torch.mean(real_rewards).item())
         # print("fake rewards ", fake_rewards)
         # print("real rewards ", real_rewards)
         loss = -torch.mean((real_rewards - fake_rewards))
@@ -309,51 +301,44 @@ if __name__ == '__main__':
 
     # Initalize Networks and optimizers
     gen = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
-    gen_optimizer = optim.Adam(gen.parameters(), lr=1e-2)
-
-    if DISCRIMINATOR_LM:
-        dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    else:
-        dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-
-
-    dis = dis.to(DEVICE)
+    genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
+    dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
-    critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    memory = replay_memory.ReplayMemory(CAPACITY_RM)
-
-
-    # OPTIONAL: Pretrain generator
+    # Pretrain generator and discriminator
     if PRETRAIN:
         print('Starting Generator MLE Training...')
-        train_generator_MLE(gen, gen_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+        train_generator_MLE(gen, genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
-        #  OPTIONAL: Pretrain discriminator
         print('\nStarting Discriminator Training...')
         for epoch in range(ADV_TRAIN_EPOCHS):
-            print('\n--------\nEPOCH %d\n--------' % (epoch+1))
             for (batch, (context, reply)) in enumerate(train_data_loader):
-                print('\n Pretraining Discriminator: ')
                 train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
-    checkpoint = torch.load("generator_checkpoint49.pth.tar", map_location='cpu')
-    state_dict = checkpoint['state_dict']
-    gen.load_state_dict(state_dict)
-
-
 
     # ADVERSARIAL TRAINING
-    print('\nStarting Adversarial Training...')
+    # Initialize actor as pre-trained generator
+    actor = generator.Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, device=DEVICE)
+    actor.load_state_dict(torch.load(ACTOR_CHECKPOINT, map_location='cpu')['state_dict'])
+
+    # Define critic and dual optimizer
+    critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    AC_optimizer = optim.Adam([
+        {'params': gen.parameters(), 'lr': ACTOR_LR},
+        {'params': critic.parameters(), 'lr': CRITIC_LR}
+    ])
+    memory = replay_memory.ReplayMemory(CAPACITY_RM)
     EOU = train_data_loader.dataset.corpus.token_to_id(DPCorpus.EOU)
+    PAD = train_data_loader.dataset.corpus.token_to_id(DPCorpus.PAD)
+
+    print('\nStarting Adversarial Training...')
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
             # TRAIN GENERATOR
             print('\nAdversarial Training Generator: ')
-            # perplexity = train_generator_PG(context, reply, gen, gen_optimizer, dis)
             perplexity = train_generator_PGAC(context.permute(1,0), reply.permute(1,0),\
-                gen, gen_optimizer, dis, memory, critic,EOU)
+                gen, dis, memory, critic, AC_optimizer,EOU,PAD)
             if batch % 10 == 0:
                 print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
