@@ -155,17 +155,19 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     Training is done for one batch.
     """
     # Forward pass
-    reply, word_probabilities = gen.sample(context, reply)
+    fake_reply, word_probabilities = gen.sample(context, reply)
+    # print("Generated reply")
+    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    # print("Real  reply")
+    # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute word-level rewards
-    rewards = dis.get_rewards(reply)
+    rewards = dis.get_rewards(fake_reply)
 
     # Compute REINFORCE loss with the assumption that G = R_t
-    sent_reward = torch.mean(rewards,1).view(-1,1)
     pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
-    print(pg_loss.item())
     # Backward pass
     gen_opt.zero_grad()
     pg_loss.backward()
@@ -262,12 +264,12 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
 
-    print(corpus.ids_to_tokens([int(i) for i in context[0]]))
-    print("Fake generated reply")
-    print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-    print("Real  reply")
-    print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
-    print(30 * "-")
+    # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
+    # print("Fake generated reply")
+    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    # print("Real  reply")
+    # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+    # print(30 * "-")
     if DISCRIMINATOR_LM:
         # print("Generated reply")
         # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
