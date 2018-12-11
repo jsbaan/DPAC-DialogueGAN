@@ -173,6 +173,7 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
         # Sample action (token) for entire batch from predicted vocab distribution
         # and set input for next forward pass
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
+        log_p = output.gather(1, action.unsqueeze(1)).view(-1).data
         input = torch.autograd.Variable(action)
 
         # Check which episodes (sampled sentences) have not encountered a EOU token
@@ -187,12 +188,12 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
         active_ep_idx[done_index] = 0
 
         for j,i in enumerate(active_index):
-            memory.push((old_state[i,:], action[i], reward[j], samples[i,:], done[i]))
+            memory.push((old_state[i,:], action[i], log_p[i], reward[j], samples[i,:], done[i]))
 
         if memory.__len__() > AC_WARMUP:
             # Retrieve batch from replay memory
             info = tuple(zip(*memory.sample(BATCH_SIZE)))
-            state, action, reward, next_state, done = [torch.stack(i) for i in info]
+            state, action, log_p, reward, next_state, done = [torch.stack(i) for i in info]
 
             # Estimate state-action values for each state in batch using critic
             q_values = critic.forward(state.long())[np.arange(BATCH_SIZE), action]
@@ -210,7 +211,7 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
             AC_optimizer.zero_grad()
             loss.backward()
             AC_optimizer.step()
-    return
+    return loss
 
 def train_discriminator(context, real_reply, discriminator, dis_opt, generator, corpus):
     """
