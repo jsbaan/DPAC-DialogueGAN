@@ -180,6 +180,9 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
             total_loss += loss.data.item()
             losses.append(loss)
 
+            if iter % 20:
+                print("loss ", loss)
+
             # print updates
             if iter % 50 == 0 and iter != 0:
             # if iter % 50 == 0:
