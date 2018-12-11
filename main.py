@@ -40,9 +40,11 @@ import time
 import replay_memory
 
 if torch.cuda.is_available():
-    DEVICE = torch.device('cuda:0')  #'
+    DEVICE = torch.device('cuda:0')
+    print("RUNNIG ON CUDA") #'
 else:
     DEVICE = torch.device('cpu')  #'cuda:0'
+    print("RUNNING ON CPU")
 VOCAB_SIZE = 5000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
