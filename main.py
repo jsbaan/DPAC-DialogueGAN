@@ -127,7 +127,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
             dis_opt.zero_grad()
 
-            fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
+            with torch.no_grad():
+                fake_reply, _, _ = gen.sample(context.permute(1,0), MAX_SEQ_LEN)
             fake_reply = fill_with_padding(fake_reply, ud_id, ignore_index)
 
             if DISCRIMINATOR_LM:
