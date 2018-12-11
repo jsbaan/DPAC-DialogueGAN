@@ -30,8 +30,8 @@ class Generator2(nn.Module):
 
         self.encoder = EncoderRNN(vocab_size, max_len-1, hidden_size, 0, enc_dropout, enc_n_layers, True, 'gru', False, None)
         self.decoder = DecoderRNN(vocab_size, max_len-1, hidden_size*2 if dec_bidirectional else hidden_size, sos_id, eou_id, dec_n_layers, 'gru', dec_bidirectional, 0, dec_dropout, True)
-        self.beam_decoder = TopKDecoder(self.decoder, beam_size)
-        self.seq2seq = Seq2seq(self.encoder, self.beam_decoder)
+        # self.beam_decoder = TopKDecoder(self.decoder, beam_size)
+        self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
     def forward(self, src, tgt):
         src = src.t()

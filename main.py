@@ -29,6 +29,7 @@ import pickle
 import os
 
 from generator import Generator
+from generator2 import Generator2
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')  #'
@@ -79,11 +80,11 @@ def train_generator_MLE(gen, optimizer, data, epochs):
     loss_func.to(DEVICE)
 
     start_epoch = 0
-    saved_data = try_get_state_dicts()
-    if saved_data is not None:
-        start_epoch = saved_data['epoch']
-        gen.load_state_dict(saved_data['state_dict'])
-        optimizer.load_state_dict(saved_data['optimizer'])
+    # saved_data = try_get_state_dicts()
+    # if saved_data is not None:
+    #     start_epoch = saved_data['epoch']
+    #     gen.load_state_dict(saved_data['state_dict'])
+    #     optimizer.load_state_dict(saved_data['optimizer'])
 
     loss_per_epoch = []
     for epoch in range(start_epoch, epochs):
@@ -238,8 +239,8 @@ if __name__ == '__main__':
     sos_id = corpus.token_to_id(corpus.SOS)
     eou_id = corpus.token_to_id(corpus.EOU)
 
-    gen = Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
-    # gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    # gen = Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
 
 
     if DISCRIMINATOR_LM:
