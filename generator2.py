@@ -48,24 +48,11 @@ class Generator2(nn.Module):
         outputs = torch.stack(outputs)
         return outputs
 
-def compute_reinforce_loss(episode, discount_factor):
-    # Compute the reinforce loss
-    # Make sure that your function runs in LINEAR TIME
-    # Don't forget to normalize your RETURNS (not rewards)
-    # Note that the rewards/returns should be maximized
-    # while the loss should be minimized so you need a - somewhere
-
-    returns = torch.zeros(len(episode))
-    a_probs = torch.zeros(len(episode))
-
-    for i,(s,a,log_p,r,s_next) in enumerate(reversed(episode)):
-        if i == 0:
-            returns[i] = r
-        else:
-            returns[i] = discount_factor * returns[i-1] + r
-        a_probs[i] = log_p
-
-    # Normalize returns
-    returns = (returns - returns.mean())/returns.std()
-    loss = - torch.sum(returns * a_probs)
-    return loss
+    def compute_reinforce_loss(self, rewards, probabilities):
+        sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
+        rewards_sentence = torch.mul(rewards, sentence_level_reward)
+        returns = torch.stack([probabilities[:, i+1].log() * torch.sum(rewards_sentence[:, i:], 1)\
+         for i in range(rewards.size(1))]).t()
+        returns_sum = torch.sum(returns, 1)
+        loss = -torch.mean(returns_sum)
+        return loss

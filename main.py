@@ -164,8 +164,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
 
     # Compute REINFORCE loss with the assumption that G = R_t
     sent_reward = torch.mean(rewards,1).view(-1,1)
-    pg_loss = -torch.sum(torch.mul(torch.mul(sent_reward,rewards), torch.log(word_probabilities[:,1:])))
-
+    pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
+    print(pg_loss.item())
     # Backward pass
     gen_opt.zero_grad()
     pg_loss.backward()
@@ -262,12 +262,12 @@ def train_discriminator(context, real_reply, discriminator, dis_opt, generator, 
 
     # UNCOMMENT FOR PRINTING SAMPLES AND CONTEXT
 
-    # print(corpus.ids_to_tokens([int(i) for i in context[0]]))
-    # print("Fake generated reply")
-    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-    # print("Real  reply")
-    # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
-    # print(30 * "-")
+    print(corpus.ids_to_tokens([int(i) for i in context[0]]))
+    print("Fake generated reply")
+    print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    print("Real  reply")
+    print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+    print(30 * "-")
     if DISCRIMINATOR_LM:
         # print("Generated reply")
         # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
@@ -384,4 +384,4 @@ if __name__ == '__main__':
 
             # TRAIN DISCRIMINATOR
             print('\nAdversarial Training Discriminator : ')
-            train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+            train_discriminator(context, reply, dis, dis_optimizer, actor, corpus)
