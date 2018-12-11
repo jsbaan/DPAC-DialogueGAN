@@ -4,7 +4,7 @@ from seq2seq.EncoderRNN import EncoderRNN
 from seq2seq.DecoderRNN import DecoderRNN
 from seq2seq.TopKDecoder import TopKDecoder
 from seq2seq.Seq2Seq import Seq2seq
-
+import sys
 class Generator2(nn.Module):
     def __init__(
             self,
@@ -33,14 +33,24 @@ class Generator2(nn.Module):
         # self.beam_decoder = TopKDecoder(self.decoder, beam_size)
         self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
+    def sample(self, src, tgt):
+        src = src.t()
+        tgt = tgt.t()
+        sentences, probabilities = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=0, sample=True)
+
+        return sentences, probabilities
     def forward(self, src, tgt):
         src = src.t()
         tgt = tgt.t()
         outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
-
         start_tokens = torch.zeros(64, self.vocab_size, device=outputs[0].device)
         start_tokens[:,self.sos_id] = 1
 
         outputs = [start_tokens] + outputs
         outputs = torch.stack(outputs)
         return outputs
+
+
+
+
+

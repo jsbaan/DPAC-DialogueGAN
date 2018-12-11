@@ -15,7 +15,7 @@ if torch.cuda.is_available():
 else:
     import torch as device
 
-
+import sys
 class DecoderRNN(BaseRNN):
     r"""
     Provides functionality for decoding in a seq2seq framework, with an option for attention.
@@ -106,7 +106,7 @@ class DecoderRNN(BaseRNN):
         return predicted_softmax, hidden, attn
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
-                    function=F.log_softmax, teacher_forcing_ratio=0):
+                    function=F.log_softmax, teacher_forcing_ratio=0, sample=False):
         ret_dict = dict()
         if self.use_attention:
             ret_dict[DecoderRNN.KEY_ATTN_SCORE] = list()
@@ -121,11 +121,15 @@ class DecoderRNN(BaseRNN):
         sequence_symbols = []
         lengths = np.array([max_length] * batch_size)
 
-        def decode(step, step_output, step_attn):
+        def decode(step, step_output, step_attn, sample=False):
             decoder_outputs.append(step_output)
             if self.use_attention:
                 ret_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
-            symbols = decoder_outputs[-1].topk(1)[1]
+            if sample:
+                symbols = torch.multinomial(torch.exp(decoder_outputs[-1]), 1)
+                probs = torch.exp(decoder_outputs[-1])[np.arange(symbols.size(0)), symbols.squeeze(1)]
+            else:
+                symbols = decoder_outputs[-1].topk(1)[1]
             sequence_symbols.append(symbols)
 
             eos_batches = symbols.data.eq(self.eos_id)
@@ -133,6 +137,8 @@ class DecoderRNN(BaseRNN):
                 eos_batches = eos_batches.cpu().view(-1).numpy()
                 update_idx = ((lengths > step) & eos_batches) != 0
                 lengths[update_idx] = len(sequence_symbols)
+            if sample:
+                return symbols, probs
             return symbols
 
         # Manual unrolling is used to support random teacher forcing.
@@ -140,7 +146,7 @@ class DecoderRNN(BaseRNN):
         if use_teacher_forcing:
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
-                                                                     function=function)
+                                                               function=function)
 
             for di in range(decoder_output.size(1)):
                 step_output = decoder_output[:, di, :]
@@ -150,17 +156,32 @@ class DecoderRNN(BaseRNN):
                     step_attn = None
                 decode(di, step_output, step_attn)
         else:
-            decoder_input = inputs[:, 0].unsqueeze(1)
-            for di in range(max_length):
-                decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
-                                                                         function=function)
-                step_output = decoder_output.squeeze(1)
-                symbols = decode(di, step_output, step_attn)
-                decoder_input = symbols
+            if sample:
+                decoder_input = inputs[:, 0].unsqueeze(1)
+                batch_size = inputs.size(0)
+                probabilities = torch.zeros(batch_size, max_length)
+                samples_sent = torch.ones(batch_size, max_length) * self.sos_id 
+                for di in range(1, max_length):
+                    decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
+                                                                             function=function)
+                    step_output = decoder_output.squeeze(1)
+                    symbols, prob_t = decode(di, step_output, step_attn, sample=True)
+                    decoder_input = symbols
+                    probabilities[:, di] = prob_t.view(-1)
+                    samples_sent[:, di] = symbols.view(-1)
+            else:
+                decoder_input = inputs[:, 0].unsqueeze(1)
+                for di in range(max_length):
+                    decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
+                                                                             function=function)
+                    step_output = decoder_output.squeeze(1)
+                    symbols = decode(di, step_output, step_attn)
+                    decoder_input = symbols
 
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
-
+        if sample:
+            return samples_sent, probabilities
         return decoder_outputs, decoder_hidden, ret_dict
 
     def _init_state(self, encoder_hidden):

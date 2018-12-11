@@ -96,7 +96,6 @@ def train_generator_MLE(gen, optimizer, data, epochs):
             optimizer.zero_grad()
             context = context.permute(1,0).to(DEVICE)
             reply = reply.permute(1,0).to(DEVICE)
-
             output = gen.forward(context, reply)
 
             # Compute loss
@@ -241,7 +240,6 @@ if __name__ == '__main__':
 
     # gen = Generator(VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
     gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
-
 
     if DISCRIMINATOR_LM:
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
