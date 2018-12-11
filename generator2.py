@@ -34,11 +34,9 @@ class Generator2(nn.Module):
         self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
     def sample(self, src, tgt):
-        src = src.t()
-        tgt = tgt.t()
         sentences, probabilities = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=0, sample=True)
-
         return sentences, probabilities
+
     def forward(self, src, tgt):
         src = src.t()
         tgt = tgt.t()
@@ -50,7 +48,24 @@ class Generator2(nn.Module):
         outputs = torch.stack(outputs)
         return outputs
 
+def compute_reinforce_loss(episode, discount_factor):
+    # Compute the reinforce loss
+    # Make sure that your function runs in LINEAR TIME
+    # Don't forget to normalize your RETURNS (not rewards)
+    # Note that the rewards/returns should be maximized
+    # while the loss should be minimized so you need a - somewhere
 
+    returns = torch.zeros(len(episode))
+    a_probs = torch.zeros(len(episode))
 
+    for i,(s,a,log_p,r,s_next) in enumerate(reversed(episode)):
+        if i == 0:
+            returns[i] = r
+        else:
+            returns[i] = discount_factor * returns[i-1] + r
+        a_probs[i] = log_p
 
-
+    # Normalize returns
+    returns = (returns - returns.mean())/returns.std()
+    loss = - torch.sum(returns * a_probs)
+    return loss
