@@ -135,12 +135,17 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                 fake_rewards = torch.sum(discriminator.get_rewards(fake_reply, ignore_index), dim=1)
                 real_rewards = torch.sum(discriminator.get_rewards(real_reply, ignore_index), dim=1)
 
+                # @TODO Do we really want the sum?
+
                 loss = -torch.mean((real_rewards - fake_rewards))
 
-                # print("Fake generated reply")
-                # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-                # print("Real  reply")
-                # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+                print("fake reward", fake_rewards[0])
+                print("real reward", real_rewards[0])
+
+                print("Fake generated reply")
+                print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+                print("Real  reply")
+                print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
                 # print("fake reward ", torch.mean(fake_rewards).item())
                 # print("real reward ", torch.mean(real_rewards).item())
@@ -176,6 +181,7 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
             # print updates
             if iter % 50 == 0 and iter != 0:
+            # if iter % 50 == 0:
                 print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
@@ -191,8 +197,11 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                     print("Real  reply")
                     print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
-                    print("fake reward ", torch.mean(fake_rewards).item())
-                    print("real reward ", torch.mean(real_rewards).item())
+                    print("fake reward", fake_rewards[0])
+                    print("real reward", real_rewards[0])
+
+                    print("mean fake reward ", torch.mean(fake_rewards).item())
+                    print("mean real reward ", torch.mean(real_rewards).item())
                 except:
                     print("Unable to print")
 

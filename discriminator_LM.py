@@ -94,14 +94,15 @@ class Discriminator(nn.Module):
 
         return rewards
 
-    def get_reward(self, history, word):
-        """
-        Calculate reward for a new word based on the history
-        """
-        criterion = nn.CrossEntropyLoss(reduction="none")
-        output = self.batchClassify(history.long())
-        reward = -criterion(output, word.long().to(self.device))
-        return reward
+    # Not working anymore
+    # def get_reward(self, history, word):
+    #     """
+    #     Calculate reward for a new word based on the history
+    #     """
+    #     criterion = nn.CrossEntropyLoss(reduction="none")
+    #     output = self.batchClassify(history.long())
+    #     reward = -criterion(output, word.long().to(self.device))
+    #     return reward
 
 
 
