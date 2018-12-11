@@ -154,11 +154,12 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                 # loss = -torch.mean((real_rewards - fake_rewards))
 
                 # @TODO Do we want the sum?
+                
+                real_r = discriminator.get_rewards(real_reply, ignore_index)
+                fake_r = discriminator.get_rewards(fake_reply, ignore_index)
 
-                rewards = discriminator.get_rewards(fake_reply, ignore_index)
-
-                real_rewards = calc_mean(discriminator.get_rewards(real_reply, ignore_index))
-                fake_rewards = calc_mean(discriminator.get_rewards(fake_reply, ignore_index))
+                real_rewards = calc_mean(real_r)
+                fake_rewards = calc_mean(fake_r)
 
                 loss = -(real_rewards - fake_rewards)
 
@@ -206,8 +207,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                 print("loss ", loss.item())
 
             # print updates
-            if iter % 50 == 0 and iter != 0:
-            # if iter % 50 == 0:
+            # if iter % 50 == 0 and iter != 0:
+            if iter % 50 == 0:
                 print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
                 total_loss = 0
                 torch.save({
@@ -223,8 +224,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                     print("Real  reply")
                     print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
-                    print("fake reward", fake_rewards[0].item())
-                    print("real reward", real_rewards[0].item())
+                    print("fake reward", calc_mean(fake_r[0].unsqueeze(0)).item())
+                    print("real reward", calc_mean(real_r[0].unsqueeze(0)).item())
 
                     print("mean fake reward ", torch.mean(fake_rewards).item())
                     print("mean real reward ", torch.mean(real_rewards).item())
