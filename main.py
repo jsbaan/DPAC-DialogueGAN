@@ -139,13 +139,13 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
                 loss = -torch.mean((real_rewards - fake_rewards))
 
-                print("fake reward", fake_rewards[0])
-                print("real reward", real_rewards[0])
+                # print("fake reward", fake_rewards[0].item())
+                # print("real reward", real_rewards[0].item())
 
-                print("Fake generated reply")
-                print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-                print("Real  reply")
-                print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
+                # print("Fake generated reply")
+                # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+                # print("Real  reply")
+                # print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
                 # print("fake reward ", torch.mean(fake_rewards).item())
                 # print("real reward ", torch.mean(real_rewards).item())
@@ -197,8 +197,8 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
                     print("Real  reply")
                     print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
 
-                    print("fake reward", fake_rewards[0])
-                    print("real reward", real_rewards[0])
+                    print("fake reward", fake_rewards[0].item())
+                    print("real reward", real_rewards[0].item())
 
                     print("mean fake reward ", torch.mean(fake_rewards).item())
                     print("mean real reward ", torch.mean(real_rewards).item())
