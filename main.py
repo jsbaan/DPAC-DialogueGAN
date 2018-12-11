@@ -97,6 +97,21 @@ def fill_with_padding(sentences, u_token, pad_token):
 
     return sentences
 
+def calc_mean(rewards):
+
+    batch_size, length = rewards.shape
+
+    total = 0
+    for i in range(batch_size):
+        reward = rewards[i]
+        idx = (reward == 0).nonzero()
+        if len(idx) > 0:
+            idx = idx[0].item()
+        else:
+            idx = length
+        total += torch.mean(reward[0:idx])
+    return total/batch_size
+
 
 def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
     """
@@ -133,12 +148,19 @@ def train_discriminator(discriminator, dis_opt, generator, corpus, epochs):
 
             if DISCRIMINATOR_LM:
 
-                fake_rewards = torch.sum(discriminator.get_rewards(fake_reply, ignore_index), dim=1)
-                real_rewards = torch.sum(discriminator.get_rewards(real_reply, ignore_index), dim=1)
+                # fake_rewards = torch.sum(discriminator.get_rewards(fake_reply, ignore_index), dim=1)
+                # real_rewards = torch.sum(discriminator.get_rewards(real_reply, ignore_index), dim=1)
 
-                # @TODO Do we really want the sum?
+                # loss = -torch.mean((real_rewards - fake_rewards))
 
-                loss = -torch.mean((real_rewards - fake_rewards))
+                # @TODO Do we want the sum?
+
+                rewards = discriminator.get_rewards(fake_reply, ignore_index)
+
+                real_rewards = calc_mean(discriminator.get_rewards(real_reply, ignore_index))
+                fake_rewards = calc_mean(discriminator.get_rewards(fake_reply, ignore_index))
+
+                loss = -(real_rewards - fake_rewards)
 
                 # print("fake reward", fake_rewards[0].item())
                 # print("real reward", real_rewards[0].item())
