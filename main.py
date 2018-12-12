@@ -35,15 +35,12 @@ import replay_memory
 # from generator import Generator
 from generator2 import Generator2
 
-# if torch.cuda.is_available():
-#     DEVICE = torch.device('cuda:0')
-#     print("RUNNIG ON CUDA") #'
-# else:
-#     DEVICE = torch.device('cpu')  #'cuda:0'
-#     print("RUNNING ON CPU")
-
-DEVICE = torch.device('cpu')
-
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda:0')
+    print("RUNNIG ON CUDA") #'
+else:
+    DEVICE = torch.device('cpu')  #'cuda:0'
+    print("RUNNING ON CPU")
 
 VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
