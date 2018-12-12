@@ -11,8 +11,8 @@ class Encoder(nn.Module):
     def __init__(self, input_size, embed_size, hidden_size,
                  n_layers=1, dropout=0.5):
         super(Encoder, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
+
+        self.vocab_size = vocab_size
         self.embed_size = embed_size
         self.embed = nn.Embedding(input_size, embed_size)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers,
@@ -74,7 +74,7 @@ class Decoder(nn.Module):
         embedded = self.dropout(embedded)
 
         # Calculate attention weights and apply to encoder outputs
-        attn_weights = self.attention(last_hidden[-1], encoder_outputs)
+        attn_weights = self.attention(last_hidden[-1], encoder_outputs)#.to(self.device)
         context = attn_weights.bmm(encoder_outputs.transpose(0, 1))  # (B,1,N)
         context = context.transpose(0, 1)  # (1,B,N)
 
@@ -98,7 +98,7 @@ class Seq2Seq(nn.Module):
         batch_size = src.size(1)
         max_len = trg.size(0)
         vocab_size = self.decoder.output_size
-        outputs = Variable(torch.zeros(max_len, batch_size, vocab_size)).to(self.device)
+        outputs = Variable(torch.zeros(max_len, batch_size, vocab_size))#.to(self.device)
 
         encoder_output, hidden = self.encoder(src)
         hidden = hidden[:self.decoder.n_layers]
@@ -109,17 +109,17 @@ class Seq2Seq(nn.Module):
             outputs[t] = output
             is_teacher = random.random() < teacher_forcing_ratio
             top1 = output.data.max(1)[1]
-            output = Variable(trg.data[t] if is_teacher else top1).to(self.device)
+            output = Variable(trg.data[t] if is_teacher else top1)#.to(self.device)
         return outputs
 
-def train(e, model, optimizer, train_iter, vocab_size, grad_clip, DE, EN,device='cpu'):
+def train(e, model, optimizer, train_iter, vocab_size, grad_clip, DE, EN):
     model.train()
     total_loss = 0
     pad = EN.vocab.stoi['<pad>']
     for b, batch in enumerate(train_iter):
         src, len_src = batch.src
         trg, len_trg = batch.trg
-        src, trg = src.to(device), trg.to(device)
+        # src, trg = src.to(device), trg.to(device)
         optimizer.zero_grad()
         output = model(src, trg)
         loss = F.nll_loss(output[1:].view(-1, vocab_size),

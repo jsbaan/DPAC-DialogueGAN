@@ -40,6 +40,7 @@ class Discriminator(nn.Module):
         out = self.dropout_linear(out)
         out = self.hidden2out(out)                                          # batch_size x 1
         out = torch.softmax(out, dim=1)
+
         return out
 
     def batchClassify(self, response):
@@ -95,15 +96,18 @@ class Discriminator(nn.Module):
 
         return rewards
 
-    # Not working anymore
-    # def get_reward(self, history, word):
-    #     """
-    #     Calculate reward for a new word based on the history
-    #     """
-    #     criterion = nn.CrossEntropyLoss(reduction="none")
-    #     output = self.batchClassify(history.long())
-    #     reward = -criterion(output, word.long().to(self.device))
-    #     return reward
+
+    def get_reward(self, history, word):
+        """
+        Calculate reward for a new word based on the history
+        """
+
+        output = self.batchClassify(history.long())
+        reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
+        reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
+
+        return reward
+
 
 
 
