@@ -33,7 +33,7 @@ import time
 import replay_memory
 
 # from generator import Generator
-from generator2 import Generator2
+from generator import Generator
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')
@@ -252,15 +252,15 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
 
 def fill_with_padding(sentences, u_token, pad_token):
     """
-    Takes a batch of sentences with equal lengths as input. 
-    Returns same size of batch but with padding filling after the first 
+    Takes a batch of sentences with equal lengths as input.
+    Returns same size of batch but with padding filling after the first
     end of utterence token.
     """
 
     for i in range(sentences.size(0)):
         sent = sentences[i]
         idx = (sent == u_token).nonzero()
-        if len(idx) > 0:    
+        if len(idx) > 0:
             idx = idx[0].item()
             split = torch.split(sent, idx+1)[0]
             padding = pad_token * torch.ones(sentences.size(1) - len(split))
@@ -300,7 +300,7 @@ def train_discriminator(gen, dis, dis_opt):
         fake_reply = fill_with_padding(fake_reply, EOU, PAD)
 
         if DISCRIMINATOR_LM:
-   
+
             real_r = dis.get_rewards(real_reply, PAD)
             fake_r = dis.get_rewards(fake_reply, PAD)
 
@@ -335,7 +335,7 @@ def train_discriminator(gen, dis, dis_opt):
 
         loss.backward()
         dis_opt.step()
-    
+
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
@@ -344,7 +344,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
 
     start_epoch = 0
-    # saved_dis = try_get_state_dicts(prefix='discriminator_checkpoint') 
+    # saved_dis = try_get_state_dicts(prefix='discriminator_checkpoint')
     # if saved_dis is not None:
     #     start_epoch = saved_dis['epoch']
     #     discriminator.load_state_dict(saved_dis['state_dict'])
@@ -364,7 +364,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             with torch.no_grad():
                 fake_reply, _ = gen.sample(context, real_reply)
             fake_reply = fill_with_padding(fake_reply, EOU, PAD)
-     
+
             real_r = dis.get_rewards(real_reply, PAD)
             fake_r = dis.get_rewards(fake_reply, PAD)
 
@@ -443,52 +443,52 @@ if __name__ == '__main__':
     PAD = train_data_loader.dataset.corpus.token_to_id(DPCorpus.PAD)
 
     # Initalize Networks and optimizers
-    gen = Generator2(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    gen = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
     genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
     dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
     dis_optimizer = optim.Adagrad(dis.parameters()) ## ADAGRAD ??
 
-    # # Pretrain generator and discriminator
-    # if PRETRAIN:
-    #     print('Starting Generator MLE Training...')
-    #     train_generator_MLE(gen, genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+    # Pretrain generator and discriminator
+    if PRETRAIN:
+        print('Starting Generator MLE Training...')
+        train_generator_MLE(gen, genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
-    #     print('\nStarting Discriminator Training...')
-    #     for epoch in range(ADV_TRAIN_EPOCHS):
-    #         for (batch, (context, reply)) in enumerate(train_data_loader):
-    #             train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
+        print('\nStarting Discriminator Training...')
+        for epoch in range(ADV_TRAIN_EPOCHS):
+            for (batch, (context, reply)) in enumerate(train_data_loader):
+                train_discriminator(context, reply, dis, dis_optimizer, gen, corpus)
 
-    # # ADVERSARIAL TRAINING
-    # # Initialize actor as pre-trained generator
-    # actor = Generator2(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
-    # actor.load_state_dict(torch.load(ACTOR_CHECKPOINT, map_location='cpu')['state_dict'])
-    # PG_optimizer = optim.Adam(actor.parameters(),ACTOR_LR)
+    # ADVERSARIAL TRAINING
+    # Initialize actor as pre-trained generator
+    actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN)
+    actor.load_state_dict(torch.load(ACTOR_CHECKPOINT, map_location='cpu')['state_dict'])
+    PG_optimizer = optim.Adam(actor.parameters(),ACTOR_LR)
 
-    # # Define critic and dual optimizer
-    # critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-    # AC_optimizer = optim.Adam([
-    #     {'params': gen.parameters(), 'lr': ACTOR_LR},
-    #     {'params': critic.parameters(), 'lr': CRITIC_LR}
-    # ])
-    # memory = replay_memory.ReplayMemory(CAPACITY_RM)
+    # Define critic and dual optimizer
+    critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+    AC_optimizer = optim.Adam([
+        {'params': gen.parameters(), 'lr': ACTOR_LR},
+        {'params': critic.parameters(), 'lr': CRITIC_LR}
+    ])
+    memory = replay_memory.ReplayMemory(CAPACITY_RM)
 
-    # print('\nStarting Adversarial Training...')
-    # for epoch in range(ADV_TRAIN_EPOCHS):
-    #     print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-    #     sys.stdout.flush()
-    #     for (batch, (context, reply)) in enumerate(train_data_loader):
-    #         # TRAIN GENERATOR
-    #         print('\nAdversarial Training Generator: ')
-    #         perplexity = train_generator_PG(context, reply,\
-    #         actor, PG_optimizer,dis)
-    #         # perplexity = train_generator_PGAC(context, reply,\
-    #         #     gen, dis, memory, critic, AC_optimizer,EOU,PAD)
-    #         if batch % 10 == 0:
-    #             print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
+    print('\nStarting Adversarial Training...')
+    for epoch in range(ADV_TRAIN_EPOCHS):
+        print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+        sys.stdout.flush()
+        for (batch, (context, reply)) in enumerate(train_data_loader):
+            # TRAIN GENERATOR
+            print('\nAdversarial Training Generator: ')
+            perplexity = train_generator_PG(context, reply,\
+            actor, PG_optimizer,dis)
+            # perplexity = train_generator_PGAC(context, reply,\
+            #     gen, dis, memory, critic, AC_optimizer,EOU,PAD)
+            if batch % 10 == 0:
+                print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
-    #         # TRAIN DISCRIMINATOR
-    #         print('\nAdversarial Training Discriminator : ')
-    #         train_discriminator(actor, dis, dis_optimizer)
+            # TRAIN DISCRIMINATOR
+            print('\nAdversarial Training Discriminator : ')
+            train_discriminator(actor, dis, dis_optimizer)
 
 
     # PRETRAINING DISCRIMINATOR
