@@ -159,17 +159,17 @@ class DecoderRNN(BaseRNN):
             if sample:
                 decoder_input = inputs[:, 0].unsqueeze(1)
                 batch_size = inputs.size(0)
-                probabilities = torch.zeros(batch_size, max_length)
-                samples_sent = torch.ones(batch_size, max_length) * self.sos_id
+                probabilities = torch.zeros(batch_size, max_length + 1) # Fix for sos token added
+                samples_sent = torch.ones(batch_size, max_length + 1) * self.sos_id
 
-                for di in range(1, max_length):
+                for di in range(max_length):
                     decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
                                                                              function=function)
                     step_output = decoder_output.squeeze(1)
                     symbols, prob_t = decode(di, step_output, step_attn, sample=True)
                     decoder_input = symbols
-                    probabilities[:, di] = prob_t.view(-1)
-                    samples_sent[:, di] = symbols.view(-1)
+                    probabilities[:, di + 1] = prob_t.view(-1) # First is Sos
+                    samples_sent[:, di + 1] = symbols.view(-1) # First is Sos
             else:
                 decoder_input = inputs[:, 0].unsqueeze(1)
                 for di in range(max_length):
