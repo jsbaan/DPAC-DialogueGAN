@@ -172,41 +172,8 @@ class Generator(nn.Module):
 
         return loss     # per batch
 
-    def batchPGLoss(self, inp, target, reward, word_probabilites, lamb=0, MC_LM=False):
-        """
-        Returns a pseudo-loss that gives corresponding policy gradients (on calling .backward()).
-        Inspired by the example in http://karpathy.github.io/2016/05/31/rl/
-
-        Inputs: inp, target
-            - inp: batch_size x seq_len
-            - target: batch_size x seq_len
-            - reward: batch_size (discriminator reward for each sentence, applied to each token of the corresponding
-                      sentence)
-            - Lambda: If causal-entropy lambda > 0
-
-            inp should be target with <s> (start letter) prepended
-        """
-
-        batch_size, max_len = target.shape
-        loss = 0
-
-        for batch in range(batch_size):
-            for word in range(max_len - 1): # No end of sequence token
-                if MC_LM:
-                    ### KLOPT NIET
-                    #  \pi(a|s) --> p(Word|State, CONTEXT)  Reward for word k --> CE(word|state)
-                    loss += word_probabilites[batch][word] * reward[batch][word] # LOG PROBALITIES ?? FIX
-                else:
-                    # Sentence level reward
-                    loss += word_probabilites[batch][word] * reward[batch] # LOG PROBALITIES ?? FIX
-
-        # loss = 0
-        # for i in range(seq_len):
-        #     out, h = self.forward(inp[i], h)
-        #     # TODO: should h be detached from graph (.detach())?
-        #     for j in range(batch_size):
-        #         loss += -out[j][target.data[i][j]]*reward[j]     # log(P(y_t|Y_1:Y_{t-1})) * Q
-        loss = - torch.mean(loss)
+    def PG_loss(self, reward, word_probabilites, lamb=0):
+        sentence_level_reward = torch.mean(reward, 1)
         if lamb > 0:
             loss = loss - lamb * torch.mean(- word_probabilites.log()) # CAUSAL ENTROP --> NOT SURE IF IT WORKS THIS WAY
         return loss
