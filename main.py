@@ -288,8 +288,8 @@ def load_data(path='dataset.pickle'):
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
-        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
-        train_MLE_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE).to(DEVICE)
+        train_MLE_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE).to(DEVICE)
 
         with open(path, 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
