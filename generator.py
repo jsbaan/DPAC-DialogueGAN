@@ -50,6 +50,7 @@ class Generator(nn.Module):
         outputs = torch.stack(outputs)
         return outputs
 
+        # NOTICE THAT DISCOUNT FACTOR is 1
     def compute_reinforce_loss(self, rewards, probabilities):
         sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
         rewards_sentence = torch.mul(rewards, sentence_level_reward)
