@@ -226,6 +226,9 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
         losses = []
 
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
+            context = context.to(DEVICE)
+            reply = reply.to(DEVICE)
+            
             dis_opt.zero_grad()
 
             with torch.no_grad():
@@ -287,8 +290,8 @@ def load_data(path='dataset.pickle'):
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
-        train_data_loader = DPDataLoader(train_dataset.to(DEVICE), batch_size=BATCH_SIZE).to(DEVICE)
-        train_MLE_data_loader = DPDataLoader(train_dataset.to(DEVICE), batch_size=BATCH_SIZE).to(DEVICE)
+        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+        train_MLE_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
 
         with open(path, 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
