@@ -161,7 +161,7 @@ def fill_with_padding(sentences, u_token, pad_token):
         idx = (sent == u_token).nonzero()
         if len(idx) > 0:
             idx = idx[0].item()
-            split = torch.split(sent, idx+1)[0]
+            split = torch.split(sent, idx+1)[0].to(DEVICE)
             padding = pad_token * torch.ones(sentences.size(1) - len(split))
             padding = padding.to(DEVICE)
             pad_sent = torch.cat((split, padding))
