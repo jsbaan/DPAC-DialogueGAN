@@ -227,8 +227,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
             context = context.to(DEVICE)
-            reply = reply.to(DEVICE)
-            
+            real_reply = real_reply.to(DEVICE)
+
             dis_opt.zero_grad()
 
             with torch.no_grad():
