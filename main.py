@@ -365,7 +365,8 @@ if __name__ == '__main__':
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
-
+                context = context.to(DEVICE)
+                reply = reply.to(DEVICE)
                 # TRAIN GENERATOR (ACTOR)
                 print('\nAdversarial Training Generator: ')
                 # Policy gradient step
@@ -379,7 +380,7 @@ if __name__ == '__main__':
 
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()
-                actor.train_generator_MLE_batch(context_MLE, reply_MLE, actorMLE_optimizer, PAD)
+                actor.train_generator_MLE_batch(context_MLE.to(DEVICE, reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
                 # TRAIN DISCRIMINATOR
                 print('\nAdversarial Training Discriminator : ')
