@@ -359,12 +359,14 @@ if __name__ == '__main__':
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
-        dataiter = iter(MLE_data_loader)
         print('\nStarting Adversarial Training...')
         for epoch in range(ADV_TRAIN_EPOCHS):
+            dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
+                if batch == 0:
+                    print(reply[0])
                 context = context.to(DEVICE)
                 reply = reply.to(DEVICE)
                 # TRAIN GENERATOR (ACTOR)
@@ -383,3 +385,4 @@ if __name__ == '__main__':
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+    print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")
