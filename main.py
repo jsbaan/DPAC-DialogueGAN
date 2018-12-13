@@ -38,13 +38,16 @@ DIS_EMBEDDING_DIM = 64
 DIS_HIDDEN_DIM = 64
 
 CAPACITY_RM = 100000
-PRETRAIN = False
+PRETRAIN_GENERATOR = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = None
+DISCRIMINATOR_CHECKPOINT = "discriminator_epoch6_iter.txt"
 GEN_MLE_LR = 1e-3
-ACTOR_LR = 1e-3
-CRITIC_LR = 1e-3
-DISCRIMINATOR_LR = 1e-3
+DISCRIMINATOR_MLE_LR = 1e-1
+ACTOR_LR = 1e-1
+CRITIC_LR = 1e-1
+DISCRIMINATOR_LR = 1e-1
 AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -159,7 +162,7 @@ def fill_with_padding(sentences, u_token, pad_token):
         idx = (sent == u_token).nonzero()
         if len(idx) > 0:
             idx = idx[0].item()
-            split = torch.split(sent, idx+1)[0]
+            split = torch.split(sent, idx+1)[0].to(DEVICE)
             padding = pad_token * torch.ones(sentences.size(1) - len(split))
             padding = padding.to(DEVICE)
             pad_sent = torch.cat((split, padding))
@@ -224,6 +227,9 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
         losses = []
 
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
+            context = context.to(DEVICE)
+            real_reply = real_reply.to(DEVICE)
+
             dis_opt.zero_grad()
 
             with torch.no_grad():
@@ -311,70 +317,69 @@ if __name__ == '__main__':
     PAD = train_data_loader.dataset.corpus.token_to_id(DPCorpus.PAD)
 
     # Pretrain generator and discriminator
-    if PRETRAIN:
+    if PRETRAIN_GENERATOR:
         print('Starting Generator MLE Training...')
         gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
         genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
         gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
 
+    if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
         # Initialize disciminator
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
-        dis_optimizer = optim.Adam(dis.parameters())
+        dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
+        gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
         saved_gen = torch.load(ACTOR_CHECKPOINT)
         gen.load_state_dict(saved_gen['state_dict'])
         pre_train_discriminator(dis, dis_optimizer, gen, corpus, DIS_TRAIN_EPOCHS)
+    if POLICY_GRADIENT:
+        ## ADVERSARIAL TRAINING
+        # Initialize actor and discriminator using pre-trained state-dict
+        actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
+            MAX_SEQ_LEN).to(DEVICE)
+        actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
+        actorMLE_optimizer = optim.Adagrad(actor.parameters(),lr=GEN_MLE_LR)
+        discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
+        DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        if DISCRIMINATOR_CHECKPOINT:
+            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
+        dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
 
-    ## ADVERSARIAL TRAINING
-    # Initialize actor and discriminator using pre-trained state-dict
-    actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
-        MAX_SEQ_LEN).to(DEVICE)
-    actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-    actorMLE_optimizer = optim.Adam(actor.parameters(),lr=GEN_MLE_LR)
-    discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
-    DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
-    if DISCRIMINATOR_CHECKPOINT:
-        discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-    dis_optimizer = optim.Adam(discriminator.parameters(),lr=DISCRIMINATOR_LR)
+        # Define critic and dual optimizer
+        if AC:
+            critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+            AC_optimizer = optim.Adagrad([
+                {'params': actor.parameters(), 'lr': ACTOR_LR},
+                {'params': critic.parameters(), 'lr': CRITIC_LR}
+            ])
+            memory = replay_memory.ReplayMemory(CAPACITY_RM)
+        # Use optimizer for baseline DP-GAN
+        else:
+            PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
-    # Define critic and dual optimizer
-    if AC:
-        critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-        AC_optimizer = optim.Adam([
-            {'params': actor.parameters(), 'lr': ACTOR_LR},
-            {'params': critic.parameters(), 'lr': CRITIC_LR}
-        ])
-        memory = replay_memory.ReplayMemory(CAPACITY_RM)
-    # Use optimizer for baseline DP-GAN
-    else:
-        PG_optimizer = optim.Adam(actor.parameters(),ACTOR_LR)
+        dataiter = iter(MLE_data_loader)
+        print('\nStarting Adversarial Training...')
+        for epoch in range(ADV_TRAIN_EPOCHS):
+            print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+            sys.stdout.flush()
+            for (batch, (context, reply)) in enumerate(train_data_loader):
+                context = context.to(DEVICE)
+                reply = reply.to(DEVICE)
+                # TRAIN GENERATOR (ACTOR)
+                # Policy gradient step
+                if AC:
+                    perplexity = train_generator_PGAC(context, reply,\
+                        actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
+                # Or actor critic step
+                else:
+                    perplexity = train_generator_PG(context, reply,\
+                    actor, PG_optimizer,discriminator)
 
-    dataiter = iter(MLE_data_loader)
-    print('\nStarting Adversarial Training...')
-    for epoch in range(ADV_TRAIN_EPOCHS):
-        print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-        sys.stdout.flush()
-        for (batch, (context, reply)) in enumerate(train_data_loader):
+                ## MLE step
+                context_MLE, reply_MLE = dataiter.next()
+                actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
-            # TRAIN GENERATOR (ACTOR)
-            print('\nAdversarial Training Generator: ')
-            # Policy gradient step
-            if AC:
-                perplexity = train_generator_PGAC(context, reply,\
-                    actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
-            # Or actor critic step
-            else:
-                perplexity = train_generator_PG(context, reply,\
-                actor, PG_optimizer,discriminator)
-
-            ## MLE step
-            context_MLE, reply_MLE = dataiter.next()
-
-            if batch % 10 == 0:
-                print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
-
-            # TRAIN DISCRIMINATOR
-            print('\nAdversarial Training Discriminator : ')
-            train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+                # TRAIN DISCRIMINATOR
+                train_discriminator(context,reply, actor, discriminator, dis_optimizer)
