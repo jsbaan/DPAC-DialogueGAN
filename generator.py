@@ -5,7 +5,7 @@ from seq2seq.DecoderRNN import DecoderRNN
 from seq2seq.TopKDecoder import TopKDecoder
 from seq2seq.Seq2Seq import Seq2seq
 import sys
-class Generator(nn.Module):
+class Generator2(nn.Module):
     def __init__(
             self,
             sos_id,
@@ -22,7 +22,7 @@ class Generator(nn.Module):
             dec_dropout=0.2,
             dec_bidirectional=True,
             teacher_forcing_ratio=0.5):
-        super(Generator, self).__init__()
+        super(Generator2, self).__init__()
 
         self.sos_id = sos_id
         self.vocab_size = vocab_size
@@ -41,7 +41,9 @@ class Generator(nn.Module):
         src = src.t()
         tgt = tgt.t()
         outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
-        start_tokens = torch.zeros(64, self.vocab_size, device=outputs[0].device)
+
+        batch_size = outputs[0].size(0)
+        start_tokens = torch.zeros(batch_size, self.vocab_size, device=outputs[0].device)
         start_tokens[:,self.sos_id] = 1
 
         outputs = [start_tokens] + outputs
@@ -51,11 +53,8 @@ class Generator(nn.Module):
     def compute_reinforce_loss(self, rewards, probabilities):
         sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
         rewards_sentence = torch.mul(rewards, sentence_level_reward)
-        returns = torch.stack(
-            [probabilities[:, i+1].log() * \
-            torch.sum(rewards_sentence[:, i:], 1)
-            for i in range(rewards.size(1))]
-            ).t()
+        returns = torch.stack([probabilities[:, i+1].log() * torch.sum(rewards_sentence[:, i:], 1)\
+         for i in range(rewards.size(1))]).t()
         returns_sum = torch.sum(returns, 1)
         loss = -torch.mean(returns_sum)
         return loss

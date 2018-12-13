@@ -420,7 +420,9 @@ def load_data(path='dataset.pickle'):
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
-        train_data_loader = DPDataLoader(train_dataset,batch_size=BATCH_SIZE)
+        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+        train_MLE_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+
         with open(path, 'wb') as handle:
             pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
             corpus = train_data_loader.dataset.corpus
@@ -428,8 +430,9 @@ def load_data(path='dataset.pickle'):
         print("Loading the data set")
         with open(path, 'rb') as handle:
             train_data_loader= pickle.load(handle)
+        train_MLE_data_loader = DPDataLoader(train_data_loader.dataset, batch_size=BATCH_SIZE)
         corpus = train_data_loader.dataset.corpus
-    return corpus,train_data_loader
+    return corpus,train_data_loader, train_MLE_data_loader
 
 if __name__ == '__main__':
     '''
@@ -437,7 +440,9 @@ if __name__ == '__main__':
     and then uses PG to alternately train them.
     '''
     # Load data set
-    corpus, train_data_loader = load_data()
+    corpus, train_data_loader, MLE_data_loader = load_data()
+
+
     SOS = train_data_loader.dataset.corpus.token_to_id(DPCorpus.SOS)
     EOU = train_data_loader.dataset.corpus.token_to_id(DPCorpus.EOU)
     PAD = train_data_loader.dataset.corpus.token_to_id(DPCorpus.PAD)
@@ -471,16 +476,22 @@ if __name__ == '__main__':
         {'params': critic.parameters(), 'lr': CRITIC_LR}
     ])
     memory = replay_memory.ReplayMemory(CAPACITY_RM)
-
+    dataiter = iter(MLE_data_loader)
     print('\nStarting Adversarial Training...')
     for epoch in range(ADV_TRAIN_EPOCHS):
         print('\n--------\nEPOCH %d\n--------' % (epoch+1))
         sys.stdout.flush()
         for (batch, (context, reply)) in enumerate(train_data_loader):
+
             # TRAIN GENERATOR
             print('\nAdversarial Training Generator: ')
+            ## Policy gradient step
             perplexity = train_generator_PG(context, reply,\
             actor, PG_optimizer,dis)
+
+            ## MLE step
+            context, reply = dataiter.next()
+            print(context.shape, reply.shape)
             # perplexity = train_generator_PGAC(context, reply,\
             #     gen, dis, memory, critic, AC_optimizer,EOU,PAD)
             if batch % 10 == 0:
@@ -492,7 +503,6 @@ if __name__ == '__main__':
 
 
     # PRETRAINING DISCRIMINATOR
-
     # Load pretrained generator
     saved_gen = torch.load('generator_checkpoint79.pth.tar')
     gen.load_state_dict(saved_gen['state_dict'])
