@@ -91,7 +91,7 @@ class Evaluator:
 
     def get_word2vec(self, embedding_model, replies):
         word2vec = {}
-
+        embedding_model = embedding_model.to(device)
         for reply in replies:
             tokens = reply.split()
 
@@ -99,7 +99,7 @@ class Evaluator:
                 if token not in word2vec:
                     id = self.corpus.token_to_id(token)
                     id_tensor = torch.tensor(id, dtype=torch.long, requires_grad=False)
-                    embedding = embedding_model(id_tensor)
+                    embedding = embedding_model(id_tensor.to(device))
                     word2vec[token] = embedding
 
         return word2vec
