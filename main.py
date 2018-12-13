@@ -309,6 +309,27 @@ def load_data(path='dataset.pickle'):
         corpus = train_data_loader.dataset.corpus
     return corpus,train_data_loader, train_MLE_data_loader
 
+def save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer):
+    torch.save({
+                        'epoch': epoch+1,
+                        'actor': actor.state_dict(),
+                        'act_optimizer' : PG_optimizer.state_dict(),
+                        'act_MLE_optimizer' : actorMLE_optimizer.state_dict(),
+                        'dis_optimizer' : dis_optimizer.state_dict(),
+                        'discriminator': discriminator.state_dict()
+                    },'adversial_checkpoint{}.pth.tar'.format(epoch))
+    print("Models and Optimizers saved")
+
+
+def perform_evaluation(evaluator, actor):
+    actor = actor.eval()
+    result = evaluator.evaluate_embeddings(actor)
+    print("Evaluation")
+    print("Greedy Match: ", result['greedy_match'][0])
+    print("Extrema Score: ", result['extrema_score'][0])
+    print("Average (Cosine similarity): ", result['average'][0])
+    actor = actor.train()
+
 if __name__ == '__main__':
     '''
     Main training loop. Pre-trains the generator and discriminator using MLE
@@ -329,7 +350,7 @@ if __name__ == '__main__':
 
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
-        # Initialize disciminator
+        # Initialize discriminator
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
@@ -366,14 +387,15 @@ if __name__ == '__main__':
 
         print('\nStarting Adversarial Training...')
         for epoch in range(ADV_TRAIN_EPOCHS):
+            if epoch % 3 == 0:
+                save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-            result = evaluator.evaluate_embeddings(actor)
-            print("Evaluation")
-            print("Greedy Match: ", result['greedy_match'][0])
-            print("Extrema Score: ", result['extrema_score'][0])
-            print("Average (Cosine similarity): ", result['average'][0])
+
+            # Evaluation
+            perform_evaluation(evaluator, actor)
+
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
