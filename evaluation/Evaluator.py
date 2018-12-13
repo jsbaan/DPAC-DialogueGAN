@@ -66,8 +66,8 @@ class Evaluator:
         generated_replies = []
 
         for (iter, (context, reply)) in enumerate(self.data_loader):
-            if self.log:
-                print(str(iter + 1) + '/' + str(len(self.data_loader)))
+            # if self.log:
+            #     print(str(iter + 1) + '/' + str(len(self.data_loader)))
             context = context.permute(1, 0).to(self.device)
             reply = reply.permute(1, 0).to(self.device)
             output = model(context, reply)
