@@ -5,7 +5,7 @@ from seq2seq.DecoderRNN import DecoderRNN
 from seq2seq.TopKDecoder import TopKDecoder
 from seq2seq.Seq2Seq import Seq2seq
 import sys
-class Generator2(nn.Module):
+class Generator(nn.Module):
     def __init__(
             self,
             sos_id,
@@ -22,7 +22,7 @@ class Generator2(nn.Module):
             dec_dropout=0.2,
             dec_bidirectional=True,
             teacher_forcing_ratio=0.5):
-        super(Generator2, self).__init__()
+        super(Generator, self).__init__()
 
         self.sos_id = sos_id
         self.vocab_size = vocab_size
@@ -58,3 +58,88 @@ class Generator2(nn.Module):
         returns_sum = torch.sum(returns, 1)
         loss = -torch.mean(returns_sum)
         return loss
+
+    def try_get_state_dicts(self,directory='./', prefix='generator_checkpoint', postfix='.pth.tar'):
+        files = os.listdir(directory)
+        files = [f for f in files if f.startswith(prefix)]
+        files = [f for f in files if f.endswith(postfix)]
+
+        epoch_nums = []
+        for file in files:
+            number = file[len(prefix):-len(postfix)]
+            try:
+                epoch_nums.append(int(number))
+            except:
+                pass
+
+        if len(epoch_nums) < 2:
+            return None
+
+        last_complete_epoch = sorted(epoch_nums)[-2]
+        filename = prefix + str(last_complete_epoch) + postfix
+
+        data = torch.load(filename)
+        return data
+
+    def train_generator_MLE(self,optimizer, data, epochs):
+        # Max Likelihood Pretraining for the generator
+        corpus = data.dataset.corpus
+        pad_id = corpus.token_to_id(corpus.PAD)
+
+        loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
+        loss_func.to(self.device)
+
+        start_epoch = 0
+        # saved_data = try_get_state_dicts()
+        # if saved_data is not None:
+        #     start_epoch = saved_data['epoch']
+        #     self.load_state_dict(saved_data['state_dict'])
+        #     optimizer.load_state_dict(saved_data['optimizer'])
+
+        loss_per_epoch = []
+        for epoch in range(start_epoch, epochs):
+            print('epoch %d : ' % (epoch + 1))
+
+            total_loss = 0
+            losses = []
+            for (iter, (context, reply)) in enumerate(train_data_loader):
+                optimizer.zero_grad()
+                # context = context.permute(1,0)
+                # reply = reply.permute(1,0)
+                output = self.forward(context, reply)
+
+                # Compute loss
+                pred_dist = output[1:].view(-1, self.vocab_size).to(self.device)
+                tgt_tokens = reply[1:].contiguous().view(-1).to(self.device)
+
+                loss = loss_func(pred_dist, tgt_tokens)
+
+                # Backpropagate loss
+                loss.backward()
+                clip_grad_norm_(self.parameters(), 10)
+                optimizer.step()
+                total_loss += loss.data.item()
+                losses.append(loss)
+
+                # Print updates
+                if iter % 50 == 0 and iter != 0:
+                    print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
+                    total_loss = 0
+                    torch.save({
+                        'epoch': epoch+1,
+                        'state_dict': self.state_dict(),
+                        'optimizer' : optimizer.state_dict(),
+                        'loss'      : losses,
+                    },'generator_checkpoint{}.pth.tar'.format(epoch))
+
+                    try:
+                        print("Generated reply")
+                        print(' '.join(corpus.ids_to_tokens([int(i) for i in output.argmax(2)[:,0]])))
+                        print("Real  reply")
+                        print(' '.join(corpus.ids_to_tokens([int(i) for i in reply[:,0]])))
+                    except:
+                        print("Unable to print")
+
+            loss_per_epoch.append(total_loss)
+        torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
+        return losses
