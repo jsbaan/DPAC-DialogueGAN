@@ -5,6 +5,7 @@ from seq2seq.DecoderRNN import DecoderRNN
 from seq2seq.TopKDecoder import TopKDecoder
 from seq2seq.Seq2Seq import Seq2seq
 import sys
+import time
 class Generator(nn.Module):
     def __init__(
             self,
@@ -53,12 +54,16 @@ class Generator(nn.Module):
         # NOTICE THAT DISCOUNT FACTOR is 1
     def compute_reinforce_loss(self, rewards, probabilities):
         sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
-        rewards_sentence = torch.mul(rewards, sentence_level_reward)
+        R_s_w = torch.mul(rewards, sentence_level_reward)
 
-        returns = torch.stack([probabilities[:, i+1].log() * torch.sum(rewards_sentence[:, i:], 1)\
-         for i in range(rewards.size(1))]).t()
-        returns_sum = torch.sum(returns, 1)
-        loss = -torch.mean(returns_sum)
+        sent_len = rewards.size(1)
+        J = 0
+        for k in range(sent_len):
+            R_k = torch.sum(R_s_w[:,k:], 1)
+            prob = probabilities[:,k+1].log()
+            J += R_k*prob
+
+        loss = -torch.mean(J)
         return loss
 
     def try_get_state_dicts(self,directory='./', prefix='generator_checkpoint', postfix='.pth.tar'):
@@ -82,7 +87,7 @@ class Generator(nn.Module):
 
         data = torch.load(filename)
         return data
-    
+
     def train_generator_MLE_batch(self, context, reply, optimizer, pad_id):
         context = context.t()
         reply = reply.t()
