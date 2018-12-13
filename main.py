@@ -360,6 +360,7 @@ if __name__ == '__main__':
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
         print('\nStarting Adversarial Training...')
+        print("IT IS UPDATED")
         for epoch in range(ADV_TRAIN_EPOCHS):
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
