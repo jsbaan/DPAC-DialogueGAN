@@ -61,12 +61,12 @@ def greedy_score(fileone, filetwo, w2v):
         Y = np.zeros((dim,1))
         for tok in tokens2:
             if tok in w2v:
-                Y = np.hstack((Y,(w2v[tok].detach().numpy().reshape((dim,1)))))
+                Y = np.hstack((Y,(w2v[tok].detach().cpu().numpy().reshape((dim,1)))))
                 y_count += 1
 
         for tok in tokens1:
             if tok in w2v:
-                tmp  = w2v[tok].detach().numpy().reshape((1,dim)).dot(Y)
+                tmp  = w2v[tok].detach().cpu().numpy().reshape((1,dim)).dot(Y)
                 o += np.max(tmp)
                 x_count += 1
 
@@ -96,11 +96,11 @@ def extrema_score(fileone, filetwo, w2v):
         X= []
         for tok in tokens1:
             if tok in w2v:
-                X.append(w2v[tok].detach().numpy())
+                X.append(w2v[tok].detach().cpu().numpy())
         Y = []
         for tok in tokens2:
             if tok in w2v:
-                Y.append(w2v[tok].detach().numpy())
+                Y.append(w2v[tok].detach().cpu().numpy())
 
         # if none of the words have embeddings in ground truth, skip
         if np.linalg.norm(X) < 0.00000000001:
@@ -155,11 +155,11 @@ def average(fileone, filetwo, w2v):
         X= np.zeros((dim,))
         for tok in tokens1:
             if tok in w2v:
-                X+=w2v[tok].detach().numpy()
+                X+=w2v[tok].detach().cpu().numpy()
         Y = np.zeros((dim,))
         for tok in tokens2:
             if tok in w2v:
-                Y += w2v[tok].detach().numpy()
+                Y += w2v[tok].detach().cpu().numpy()
 
         # if none of the words in ground truth have embeddings, skip
         if np.linalg.norm(X) < 0.00000000001:
