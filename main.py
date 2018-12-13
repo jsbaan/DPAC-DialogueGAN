@@ -368,7 +368,6 @@ if __name__ == '__main__':
                 context = context.to(DEVICE)
                 reply = reply.to(DEVICE)
                 # TRAIN GENERATOR (ACTOR)
-                print('\nAdversarial Training Generator: ')
                 # Policy gradient step
                 if AC:
                     perplexity = train_generator_PGAC(context, reply,\
@@ -383,5 +382,4 @@ if __name__ == '__main__':
                 actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
                 # TRAIN DISCRIMINATOR
-                print('\nAdversarial Training Discriminator : ')
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
