@@ -384,17 +384,17 @@ if __name__ == '__main__':
         # Use optimizer for baseline DP-GAN
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
-
-        print('\nStarting Adversarial Training...')
+        # Evaluation
+        print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
             if epoch % 3 == 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
+            perform_evaluation(evaluator, actor)
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
-            # Evaluation
-            perform_evaluation(evaluator, actor)
+         
 
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
