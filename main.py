@@ -39,10 +39,10 @@ DIS_HIDDEN_DIM = 64
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = None
+DISCRIMINATOR_CHECKPOINT = "discriminator_epoch6_iter.txt"
 GEN_MLE_LR = 1e-3
 DISCRIMINATOR_MLE_LR = 1e-1
 ACTOR_LR = 1e-1
@@ -334,7 +334,6 @@ if __name__ == '__main__':
         saved_gen = torch.load(ACTOR_CHECKPOINT)
         gen.load_state_dict(saved_gen['state_dict'])
         pre_train_discriminator(dis, dis_optimizer, gen, corpus, DIS_TRAIN_EPOCHS)
-
     if POLICY_GRADIENT:
         ## ADVERSARIAL TRAINING
         # Initialize actor and discriminator using pre-trained state-dict
@@ -381,9 +380,6 @@ if __name__ == '__main__':
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()
                 actor.train_generator_MLE_batch(context_MLE, reply_MLE, actorMLE_optimizer, PAD)
-
-                if batch % 10 == 0:
-                    print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
 
                 # TRAIN DISCRIMINATOR
                 print('\nAdversarial Training Discriminator : ')
