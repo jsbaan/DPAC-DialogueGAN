@@ -380,7 +380,7 @@ if __name__ == '__main__':
 
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()
-                actor.train_generator_MLE_batch(context_MLE.to(DEVICE, reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
+                actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
                 # TRAIN DISCRIMINATOR
                 print('\nAdversarial Training Discriminator : ')
