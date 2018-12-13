@@ -44,9 +44,10 @@ POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_CHECKPOINT = None
 GEN_MLE_LR = 1e-3
-ACTOR_LR = 1e-3
-CRITIC_LR = 1e-3
-DISCRIMINATOR_LR = 1e-3
+DISCRIMINATOR_MLE_LR = 1e-1
+ACTOR_LR = 1e-1
+CRITIC_LR = 1e-1
+DISCRIMINATOR_LR = 1e-1
 AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -326,7 +327,7 @@ if __name__ == '__main__':
         print('\nStarting Discriminator MLE Training...')
         # Initialize disciminator
         dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
-        dis_optimizer = optim.Adam(dis.parameters())
+        dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
         gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
@@ -340,24 +341,24 @@ if __name__ == '__main__':
         actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
             MAX_SEQ_LEN).to(DEVICE)
         actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-        actorMLE_optimizer = optim.Adam(actor.parameters(),lr=GEN_MLE_LR)
+        actorMLE_optimizer = optim.Adagrad(actor.parameters(),lr=GEN_MLE_LR)
         discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
         DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-        dis_optimizer = optim.Adam(discriminator.parameters(),lr=DISCRIMINATOR_LR)
+        dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
 
         # Define critic and dual optimizer
         if AC:
             critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
-            AC_optimizer = optim.Adam([
+            AC_optimizer = optim.Adagrad([
                 {'params': actor.parameters(), 'lr': ACTOR_LR},
                 {'params': critic.parameters(), 'lr': CRITIC_LR}
             ])
             memory = replay_memory.ReplayMemory(CAPACITY_RM)
         # Use optimizer for baseline DP-GAN
         else:
-            PG_optimizer = optim.Adam(actor.parameters(),ACTOR_LR)
+            PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
         dataiter = iter(MLE_data_loader)
         print('\nStarting Adversarial Training...')
