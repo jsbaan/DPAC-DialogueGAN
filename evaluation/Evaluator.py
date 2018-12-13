@@ -7,7 +7,7 @@ from evaluation.embedding_metrics import *
 import torch
 
 class Evaluator:
-    def __init__(self, data_loader_path='dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128):
+    def __init__(self, data_loader_path='dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128, device="cpu"):
         self.log = log
         self.vocab_size = vocab_size
         self.min_seq_len = min_seq_len
@@ -19,6 +19,7 @@ class Evaluator:
         self.corpus = self.data_loader.dataset.corpus
         self.sos_id = self.corpus.token_to_id(self.corpus.SOS)
         self.eou_id = self.corpus.token_to_id(self.corpus.EOU)
+        self.device = device
 
     def load_data_loader(self, path):
         if not os.path.isfile(path):
@@ -67,9 +68,8 @@ class Evaluator:
         for (iter, (context, reply)) in enumerate(self.data_loader):
             if self.log:
                 print(str(iter + 1) + '/' + str(len(self.data_loader)))
-
-            context = context.permute(1, 0)
-            reply = reply.permute(1, 0)
+            context = context.permute(1, 0).to(self.device)
+            reply = reply.permute(1, 0).to(self.device)
             output = model(context, reply)
 
             for i in range(context.size(1)):

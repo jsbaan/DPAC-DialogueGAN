@@ -54,6 +54,7 @@ AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
+# Number of gen
 
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
@@ -349,7 +350,7 @@ if __name__ == '__main__':
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
-        evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING)
+        evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
 
         # Define critic and dual optimizer
         if AC:
