@@ -326,6 +326,7 @@ if __name__ == '__main__':
         dis_optimizer = optim.Adam(dis.parameters())
 
         # Load pretrained generator
+        gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
         saved_gen = torch.load(ACTOR_CHECKPOINT)
         gen.load_state_dict(saved_gen['state_dict'])
         pre_train_discriminator(dis, dis_optimizer, gen, corpus, DIS_TRAIN_EPOCHS)
