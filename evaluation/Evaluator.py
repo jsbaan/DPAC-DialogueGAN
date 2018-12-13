@@ -1,103 +1,106 @@
-from __future__ import print_function
-
-import torch.optim as optim
-import torch.nn as nn
-from torch.nn.utils import clip_grad_norm_
-from seq2seq.TopKDecoder import TopKDecoder
-
-import discriminator
-import discriminator_LM
-from helpers import *
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
+from torchnlp.metrics import get_moses_multi_bleu
 import pickle
 import os
-from torchnlp.metrics import *
+from nlgeval import NLGEval
+from embedding_metrics import *
+import torch
 
-from generator import Generator
-from generator2 import Generator2
+class Evaluator:
+    def __init__(self, data_loader_path='../dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128):
+        self.log = log
+        self.vocab_size = vocab_size
+        self.min_seq_len = min_seq_len
+        self.max_seq_len = max_seq_len
+        self.batch_size = batch_size
 
-if torch.cuda.is_available():
-    DEVICE = torch.device('cuda:0')  #'
-else:
-    DEVICE = torch.device('cpu')  #'cuda:0'
-VOCAB_SIZE = 8000
-MIN_SEQ_LEN = 5
-MAX_SEQ_LEN = 20
-BATCH_SIZE = 64
-MLE_TRAIN_EPOCHS = 100
-ADV_TRAIN_EPOCHS = 50
+        self.load_data_loader(data_loader_path + 'test_loader' + '_' + str(batch_size) + '.pickle')
 
-GEN_EMBEDDING_DIM = 256
-GEN_HIDDEN_DIM = 256
-DIS_EMBEDDING_DIM = 64
-DIS_HIDDEN_DIM = 64
-DISCRIMINATOR_LM = False     # one of the two (DISCRIMINATOR_LM or MC) must be False
-MC = True
+        self.corpus = self.data_loader.dataset.corpus
+        self.sos_id = self.corpus.token_to_id(self.corpus.SOS)
+        self.eou_id = self.corpus.token_to_id(self.corpus.EOU)
 
-def get_data():
+    def load_data_loader(self, path):
+        if not os.path.isfile(path):
+            corpus = DPCorpus(vocabulary_limit=self.vocab_size)
+            dataset = corpus.get_test_dataset(min_reply_length=self.min_seq_len, max_reply_length=self.max_seq_len)
+            self.data_loader = DPDataLoader(dataset, batch_size=self.batch_size)
 
-    if not os.path.isfile('dataloader/daily_dialog/test_loader.pickle'):
-        corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
-        test_dataset = corpus.get_test_dataset(min_reply_length=MIN_SEQ_LEN, max_reply_length=MAX_SEQ_LEN)
-        test_data_loader = DPDataLoader(test_dataset, batch_size=BATCH_SIZE)
+            with open(path, 'wb') as f:
+                pickle.dump(self.data_loader, f, protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            with open(path, 'rb') as f:
+                self.data_loader= pickle.load(f)
 
-        with open('dataloader/daily_dialog/test_loader.pickle', 'wb') as f:
-            pickle.dump(test_data_loader, f, protocol=pickle.HIGHEST_PROTOCOL)
-    else:
-        with open('dataloader/daily_dialog/test_loader.pickle', 'rb') as f:
-            test_data_loader= pickle.load(f)
-        corpus = test_data_loader.dataset.corpus
+    def evaluate_embeddings(self, model, real_path='real.txt', generated_path='generated.txt'):
+        real_replies, generated_replies = self.get_replies(model)
 
-    return corpus, test_data_loader
+        with open(real_path, 'w') as file:
+            for reply in real_replies:
+                file.write("%s\n" % reply)
 
-if __name__ == '__main__':
-    corpus, test_data_loader = get_data()
+        with open(generated_path, 'w') as file:
+            for reply in generated_replies:
+                file.write("%s\n" % reply)
 
-    sos_id = corpus.token_to_id(corpus.SOS)
-    eou_id = corpus.token_to_id(corpus.EOU)
-    gen = Generator2(sos_id, eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, teacher_forcing_ratio=0)
+        embedding_model = model.encoder.embedding
+        word2vec = self.get_word2vec(embedding_model, real_replies+generated_replies)
 
-    data = torch.load('./generator_checkpoint59.pth.tar', map_location='cpu')
-    gen.load_state_dict(data['state_dict'])
+        result = {
+            'greedy_match' : greedy_match(real_path, generated_path, word2vec),
+            'extrema_score' : extrema_score(real_path, generated_path, word2vec),
+            'average' : average(real_path, generated_path, word2vec)
+        }
 
-    gen.decoder = TopKDecoder(gen.decoder, 20)
-    gen.to(DEVICE)
+        return result
 
-    real_replies = []
-    generated_replies = []
+    def evaluate_nlg(self, model):
+        real_replies, generated_replies = self.get_replies(model)
 
-    for (iter, (context, reply)) in enumerate(test_data_loader):
-        print(str(iter+1) + '/' + str(len(test_data_loader)))
+        eval = NLGEval()
+        return eval.compute_individual_metrics(ref=real_replies, hyp=generated_replies)
 
-        context = context.permute(1,0).to(DEVICE)
-        reply = reply.permute(1,0).to(DEVICE)
-        output = gen.forward(context, reply)
+    def get_replies(self, model):
+        real_replies = []
+        generated_replies = []
 
-        for i in range(context.size(1)):
-            context_i = ' '.join(corpus.ids_to_tokens([int(i) for i in context[:,i]]))
-            real_i = ' '.join(corpus.ids_to_tokens([int(i) for i in reply[:,i]]))
+        for (iter, (context, reply)) in enumerate(self.data_loader):
+            if self.log:
+                print(str(iter + 1) + '/' + str(len(self.data_loader)))
 
-            output_i = [int(i) for i in output.argmax(2)[:, i].tolist()]
-            try:
-                eou_i = output.index(eou_id)
-                output_i = output[:eou_i + 1]
-            except:
-                pass
-            generated_i = ' '.join(corpus.ids_to_tokens([int(i) for i in output_i]))
+            context = context.permute(1, 0)
+            reply = reply.permute(1, 0)
+            output = model(context, reply)
 
-            real_replies.append(real_i)
-            generated_replies.append(generated_i)
+            for i in range(context.size(1)):
+                context_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in context[:, i]]))
+                real_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in reply[:, i]]))
 
-            if i == 0:
-                print('Context')
-                print(context_i)
-                print('Real reply')
-                print(real_i)
-                print('Generated reply')
-                print(generated_i)
-                print()
+                output_i = [int(i) for i in output.argmax(2)[:, i].tolist()]
+                try:
+                    eou_i = output.index(self.eou_id)
+                    output_i = output[:eou_i + 1]
+                except:
+                    pass
+                generated_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in output_i]))
 
-    bleu = get_moses_multi_bleu(generated_replies, real_replies)
-    print('BLUE')
-    print(bleu)
+                real_replies.append(real_i)
+                generated_replies.append(generated_i)
+
+        return real_replies, generated_replies
+
+    def get_word2vec(self, embedding_model, replies):
+        word2vec = {}
+
+        for reply in replies:
+            tokens = reply.split()
+
+            for token in tokens:
+                if token not in word2vec:
+                    id = self.corpus.token_to_id(token)
+                    id_tensor = torch.tensor(id, dtype=torch.long, requires_grad=False)
+                    embedding = embedding_model(id_tensor)
+                    word2vec[token] = embedding
+
+        return word2vec
