@@ -41,7 +41,9 @@ class Generator2(nn.Module):
         src = src.t()
         tgt = tgt.t()
         outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
-        start_tokens = torch.zeros(64, self.vocab_size, device=outputs[0].device)
+
+        batch_size = outputs[0].size(0)
+        start_tokens = torch.zeros(batch_size, self.vocab_size, device=outputs[0].device)
         start_tokens[:,self.sos_id] = 1
 
         outputs = [start_tokens] + outputs
