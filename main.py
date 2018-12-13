@@ -371,6 +371,7 @@ if __name__ == '__main__':
 
             ## MLE step
             context_MLE, reply_MLE = dataiter.next()
+            actor.train_generator_MLE_batch(context_MLE, reply_MLE, actorMLE_optimizer, PAD)
 
             if batch % 10 == 0:
                 print("After " + str(batch) + " batches, the perplexity is: " + str(perplexity))
