@@ -367,22 +367,22 @@ if __name__ == '__main__':
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 if batch == 0:
                     print(reply[0])
-                context = context.to(DEVICE)
-                reply = reply.to(DEVICE)
-                # TRAIN GENERATOR (ACTOR)
-                # Policy gradient step
-                if AC:
-                    perplexity = train_generator_PGAC(context, reply,\
-                        actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
-                # Or actor critic step
-                else:
-                    perplexity = train_generator_PG(context, reply,\
-                    actor, PG_optimizer,discriminator)
+                # context = context.to(DEVICE)
+                # reply = reply.to(DEVICE)
+                # # TRAIN GENERATOR (ACTOR)
+                # # Policy gradient step
+                # if AC:
+                #     perplexity = train_generator_PGAC(context, reply,\
+                #         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
+                # # Or actor critic step
+                # else:
+                #     perplexity = train_generator_PG(context, reply,\
+                #     actor, PG_optimizer,discriminator)
 
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()
-                actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
+                # actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
                 # TRAIN DISCRIMINATOR
-                train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+                # train_discriminator(context,reply, actor, discriminator, dis_optimizer)
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")
