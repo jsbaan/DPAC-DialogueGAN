@@ -14,6 +14,8 @@ import pickle
 import os
 import time
 import replay_memory
+from evaluation.Evaluator import Evaluator
+
 
 from generator import Generator
 
@@ -51,6 +53,7 @@ DISCRIMINATOR_LR = 1e-1
 AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
+BATCH_SIZE_TESTING = 256
 
 def train_generator_PG(context, reply, gen, gen_opt, dis):
     """
@@ -346,6 +349,7 @@ if __name__ == '__main__':
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
+        evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING)
 
         # Define critic and dual optimizer
         if AC:
@@ -360,30 +364,33 @@ if __name__ == '__main__':
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
         print('\nStarting Adversarial Training...')
-        print("IT IS UPDATED")
         for epoch in range(ADV_TRAIN_EPOCHS):
+
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
+            result = evaluator.evaluate_embeddings(actor)
+            print("Evaluation")
+            print("Greedy Match: ", result['greedy_match'][0])
+            print("Extrema Score: ", result['extrema_score'][0])
+            print("Average (Cosine similarity): ", result['average'][0])
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
-                if batch == 0:
-                    print(reply[0])
-                # context = context.to(DEVICE)
-                # reply = reply.to(DEVICE)
-                # # TRAIN GENERATOR (ACTOR)
-                # # Policy gradient step
-                # if AC:
-                #     perplexity = train_generator_PGAC(context, reply,\
-                #         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
-                # # Or actor critic step
-                # else:
-                #     perplexity = train_generator_PG(context, reply,\
-                #     actor, PG_optimizer,discriminator)
+                context = context.to(DEVICE)
+                reply = reply.to(DEVICE)
+                # TRAIN GENERATOR (ACTOR)
+                # Policy gradient step
+                if AC:
+                    perplexity = train_generator_PGAC(context, reply,\
+                        actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
+                # Or actor critic step
+                else:
+                    perplexity = train_generator_PG(context, reply,\
+                    actor, PG_optimizer,discriminator)
 
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()
-                # actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
+                actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
 
                 # TRAIN DISCRIMINATOR
-                # train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+                train_discriminator(context,reply, actor, discriminator, dis_optimizer)
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")

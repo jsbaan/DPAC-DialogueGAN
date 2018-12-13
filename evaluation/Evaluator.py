@@ -1,21 +1,20 @@
 from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
-from torchnlp.metrics import get_moses_multi_bleu
 import pickle
 import os
-from nlgeval import NLGEval
-from embedding_metrics import *
+# from nlgeval import NLGEval
+from evaluation.embedding_metrics import *
 import torch
 
 class Evaluator:
-    def __init__(self, data_loader_path='../dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128):
+    def __init__(self, data_loader_path='dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128):
         self.log = log
         self.vocab_size = vocab_size
         self.min_seq_len = min_seq_len
         self.max_seq_len = max_seq_len
         self.batch_size = batch_size
 
-        self.load_data_loader(data_loader_path + 'test_loader' + '_' + str(batch_size) + '.pickle')
+        self.load_data_loader(data_loader_path + 'validation_loader' + '_' + str(batch_size) + '.pickle')
 
         self.corpus = self.data_loader.dataset.corpus
         self.sos_id = self.corpus.token_to_id(self.corpus.SOS)
@@ -24,7 +23,7 @@ class Evaluator:
     def load_data_loader(self, path):
         if not os.path.isfile(path):
             corpus = DPCorpus(vocabulary_limit=self.vocab_size)
-            dataset = corpus.get_test_dataset(min_reply_length=self.min_seq_len, max_reply_length=self.max_seq_len)
+            dataset = corpus.get_validation_dataset(min_reply_length=self.min_seq_len, max_reply_length=self.max_seq_len)
             self.data_loader = DPDataLoader(dataset, batch_size=self.batch_size)
 
             with open(path, 'wb') as f:
