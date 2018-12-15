@@ -19,13 +19,13 @@ if __name__ == '__main__':
     evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE)
 
     result = {}
-    for i in range(9, 89, 10):
+    for i in range(0, 32):
         gen = Generator(evaluator.sos_id, evaluator.eou_id, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN, teacher_forcing_ratio=0)
 
-        model_path = '../models/generator_checkpoint' + str(i) + '.pth.tar'
+        model_path = '../generator_checkpoint' + str(i) + '.pth.tar'
         data = torch.load(model_path, map_location='cpu')
         gen.load_state_dict(data['state_dict'])
-        gen.decoder = TopKDecoder(gen.decoder, 20)
+        gen.decoder = TopKDecoder(gen.decoder, 5)
         gen.to(DEVICE)
 
         print('Evaluating ' + model_path)
