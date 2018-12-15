@@ -105,12 +105,13 @@ class Generator(nn.Module):
         nn.utils.clip_grad_norm_(self.parameters(), 10) # might be something to check
         optimizer.step()
 
-    def train_generator_MLE(self, optimizer, data_loader, epochs):
+    def train_generator_MLE(self, optimizer, data_loader, epochs, device):
         # Max Likelihood Pretraining for the generator
         corpus = data_loader.dataset.corpus
         pad_id = corpus.token_to_id(corpus.PAD)
 
         loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
+        loss_func.to(device)
 
         start_epoch = 0
         # saved_data = try_get_state_dicts()
@@ -127,8 +128,8 @@ class Generator(nn.Module):
             losses = []
             for (iter, (context, reply)) in enumerate(data_loader):
                 optimizer.zero_grad()
-                context = context.t()
-                reply = reply.t()
+                context = context.t().to(device)
+                reply = reply.t().to(device)
                 output = self.forward(context, reply)
 
                 # Compute loss
