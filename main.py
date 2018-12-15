@@ -387,10 +387,10 @@ if __name__ == '__main__':
         # Evaluation
         print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
-            if epoch % 3 == 0:
+            perform_evaluation(evaluator, actor)
+            if epoch % 3 == 0 and epoch > 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
-            perform_evaluation(evaluator, actor)
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
