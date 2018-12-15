@@ -6,6 +6,8 @@ from seq2seq.TopKDecoder import TopKDecoder
 from seq2seq.Seq2Seq import Seq2seq
 import sys
 import time
+from torch.nn.utils import clip_grad_norm_
+
 class Generator(nn.Module):
     def __init__(
             self,
@@ -103,13 +105,12 @@ class Generator(nn.Module):
         nn.utils.clip_grad_norm_(self.parameters(), 10) # might be something to check
         optimizer.step()
 
-    def train_generator_MLE(self,optimizer, data, epochs):
+    def train_generator_MLE(self, optimizer, data_loader, epochs):
         # Max Likelihood Pretraining for the generator
-        corpus = data.dataset.corpus
+        corpus = data_loader.dataset.corpus
         pad_id = corpus.token_to_id(corpus.PAD)
 
         loss_func = torch.nn.NLLLoss(ignore_index=pad_id)
-        loss_func.to(self.device)
 
         start_epoch = 0
         # saved_data = try_get_state_dicts()
@@ -124,8 +125,10 @@ class Generator(nn.Module):
 
             total_loss = 0
             losses = []
-            for (iter, (context, reply)) in enumerate(train_data_loader):
+            for (iter, (context, reply)) in enumerate(data_loader):
                 optimizer.zero_grad()
+                context = context.t()
+                reply = reply.t()
                 output = self.forward(context, reply)
 
                 # Compute loss
