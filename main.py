@@ -46,10 +46,10 @@ POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_CHECKPOINT = "discriminator_epoch6_iter.txt"
 GEN_MLE_LR = 1e-3
-DISCRIMINATOR_MLE_LR = 1e-1
-ACTOR_LR = 1e-1
-CRITIC_LR = 1e-1
-DISCRIMINATOR_LR = 1e-1
+DISCRIMINATOR_MLE_LR = 1e-3
+ACTOR_LR = 1e-3
+CRITIC_LR = 1e-3
+DISCRIMINATOR_LR = 1e-3
 AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -394,7 +394,7 @@ if __name__ == '__main__':
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
-         
+
 
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
