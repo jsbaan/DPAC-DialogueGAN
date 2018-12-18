@@ -36,8 +36,8 @@ class Generator(nn.Module):
         # self.beam_decoder = TopKDecoder(self.decoder, beam_size)
         self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
-    def sample(self, src, tgt):
-        sentences, probabilities = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=0, sample=True)
+    def sample(self, src, tgt,TF=0):
+        sentences, probabilities = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=TF, sample=True)
         return sentences, probabilities
 
     def forward(self, src, tgt):
