@@ -4,7 +4,7 @@ import torch.optim as optim
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
 
-import discriminator_LM
+import discriminator
 import critic
 
 from helpers import *
@@ -14,7 +14,10 @@ import pickle
 import os
 import time
 import replay_memory
+import numpy as np
 from evaluation.Evaluator import Evaluator
+import matplotlib.pyplot as plt
+
 
 
 from generator import Generator
@@ -32,7 +35,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 50
+DIS_TRAIN_EPOCHS = 1
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -44,7 +47,7 @@ PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = "discriminator_epoch6_iter.txt"
+DISCRIMINATOR_CHECKPOINT = None
 GEN_MLE_LR = 1e-3
 DISCRIMINATOR_MLE_LR = 1e-3
 ACTOR_LR = 1e-3
@@ -54,24 +57,24 @@ AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
+NUM_SAMPLES = 3
 # Number of gen
 
-def train_generator_PG(context, reply, gen, gen_opt, dis):
+def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
     Training is done for one batch.
     """
-    # Forward pass
-    fake_reply, word_probabilities = gen.sample(context, reply)
+    # Forward passdis, context, seq, hiddens, num_samples
+    fake_reply, word_probabilities, hiddens = gen.sample(context, reply)
+
     # print("Generated reply")
     # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
     # print("Real  reply")
     # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
-    entropy = torch.mean(word_probabilities.log(), dim=1)
-    perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute word-level rewards
-    rewards = dis.get_rewards(fake_reply, PAD)
+    rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples)
 
     # Compute REINFORCE loss with the assumption that G = R_t
     pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
@@ -79,7 +82,6 @@ def train_generator_PG(context, reply, gen, gen_opt, dis):
     gen_opt.zero_grad()
     pg_loss.backward()
     gen_opt.step()
-    return perplexity
 
 def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer, EOU,PAD):
     """
@@ -191,22 +193,28 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
     Training the discriminator on real_data_samples (positive) and generated samples from generator (negative).
     Samples are drawn d_steps times, and the discriminator is trained for epochs epochs.
     """
+    fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
+    real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
+    loss = nn.BCELoss()
 
     dis_opt.zero_grad()
 
     with torch.no_grad():
-        fake_reply, _= gen.sample(context, real_reply)
-    fake_reply = fill_with_padding(fake_reply, EOU, PAD)
+        fake_reply, _ , _= gen.sample(context, real_reply)
+    fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
-    real_r = dis.get_rewards(real_reply, PAD)
-    fake_r = dis.get_rewards(fake_reply, PAD)
+    # Get probabilities/rewards for real/fake
+    real_r = dis.batchClassify(real_reply)
+    fake_r = dis.batchClassify(fake_reply)
 
-    real_rewards = calc_mean(real_r)
-    fake_rewards = calc_mean(fake_r)
+    # Learn with fake_r 
+    dis_opt.zero_grad()
+    loss_fake = loss(fake_r, fake_labels)
 
-    loss = -(real_rewards - fake_rewards)
+    loss_real = loss(real_r, real_labels)
+    loss_total = loss_real + loss_fake
+    loss_total.backward()
 
-    loss.backward()
     dis_opt.step()
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
@@ -223,68 +231,41 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     #     dis_opt.load_state_dict(saved_dis['optimizer'])
 
     loss_per_epoch = []
-
+    losses = []
+    print("Number of epochs", epochs)
     for epoch in range(start_epoch, epochs):
         print('epoch %d : ' % (epoch + 1))
 
         total_loss = 0
-        losses = []
-
+        loss = nn.BCELoss()
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
+            fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
+            real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
             context = context.to(DEVICE)
             real_reply = real_reply.to(DEVICE)
 
+            # Sample setences
+            fake_reply, _ = gen.sample(context, real_reply)
+
+            # Add padding
+            fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
+
+            # Get probabilities/rewards for real/fake
+            real_r = dis.batchClassify(real_reply)
+            fake_r = dis.batchClassify(fake_reply)
+
+            # Learn with fake_r 
             dis_opt.zero_grad()
+            loss_fake = loss(fake_r, fake_labels)
 
-            with torch.no_grad():
-                fake_reply, _ = gen.sample(context, real_reply)
-            fake_reply = fill_with_padding(fake_reply, EOU, PAD)
-
-            real_r = dis.get_rewards(real_reply, PAD)
-            fake_r = dis.get_rewards(fake_reply, PAD)
-
-            real_rewards = calc_mean(real_r)
-            fake_rewards = calc_mean(fake_r)
-
-            loss = -(real_rewards - fake_rewards)
-
-            loss.backward()
+            loss_real = loss(real_r, real_labels)
+            loss_total = loss_real + loss_fake
+            loss_total.backward()
             dis_opt.step()
-            total_loss += loss.data.item()
-            losses.append(loss)
-
-            if iter % 20 == 0:
-                print("loss ", loss.item())
-
-            # print updates
-            # if iter % 50 == 0 and iter != 0:
-            if iter % 50 == 0:
-                print('[Epoch {} iter {}] loss: {}'.format(epoch,iter,total_loss/50))
-                total_loss = 0
-                torch.save({
-                    'epoch': epoch+1,
-                    'state_dict': dis.state_dict(),
-                    'optimizer' : dis_opt.state_dict(),
-                    'loss'      : losses,
-                },'discriminator_checkpoint{}.pth.tar'.format(epoch))
-
-                try:
-                    print("Fake generated reply")
-                    print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-                    print("Real  reply")
-                    print(corpus.ids_to_tokens([int(i) for i in real_reply[0]]))
-
-                    print("fake reward", calc_mean(fake_r[0].unsqueeze(0)).item())
-                    print("real reward", calc_mean(real_r[0].unsqueeze(0)).item())
-
-                    print("mean fake reward ", torch.mean(fake_rewards).item())
-                    print("mean real reward ", torch.mean(real_rewards).item())
-                except:
-                    print("Unable to print")
-
-
-        loss_per_epoch.append(total_loss)
-    torch.save(loss_per_epoch, "discriminator_final_loss.pth.tar")
+            losses.append(loss_total.item())
+    plt.plot(losses)
+    plt.show()
+    torch.save(discriminator.state_dict(), "discriminator_final.pth.tar")
 
 def load_data(path='dataset.pickle'):
     """
@@ -351,12 +332,12 @@ if __name__ == '__main__':
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
         # Initialize discriminator
-        dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
         gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
-        saved_gen = torch.load(ACTOR_CHECKPOINT)
+        saved_gen = torch.load(ACTOR_CHECKPOINT, map_location=DEVICE)
         gen.load_state_dict(saved_gen['state_dict'])
         pre_train_discriminator(dis, dis_optimizer, gen, corpus, DIS_TRAIN_EPOCHS)
     if POLICY_GRADIENT:
@@ -366,7 +347,7 @@ if __name__ == '__main__':
             MAX_SEQ_LEN).to(DEVICE)
         actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         actorMLE_optimizer = optim.Adagrad(actor.parameters(),lr=GEN_MLE_LR)
-        discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
+        discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM, \
         DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
@@ -387,7 +368,7 @@ if __name__ == '__main__':
         # Evaluation
         print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
-            perform_evaluation(evaluator, actor)
+            # perform_evaluation(evaluator, actor)
             if epoch % 3 == 0 and epoch > 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
@@ -408,7 +389,7 @@ if __name__ == '__main__':
                 # Or actor critic step
                 else:
                     perplexity = train_generator_PG(context, reply,\
-                    actor, PG_optimizer,discriminator)
+                    actor, PG_optimizer,discriminator, NUM_SAMPLES)
 
                 ## MLE step
                 context_MLE, reply_MLE = dataiter.next()

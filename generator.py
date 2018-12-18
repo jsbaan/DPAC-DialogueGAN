@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from seq2seq.EncoderRNN import EncoderRNN
 from seq2seq.DecoderRNN import DecoderRNN
 from seq2seq.TopKDecoder import TopKDecoder
@@ -7,6 +8,7 @@ from seq2seq.Seq2Seq import Seq2seq
 import sys
 import time
 from torch.nn.utils import clip_grad_norm_
+import numpy as np
 
 class Generator(nn.Module):
     def __init__(
@@ -30,6 +32,7 @@ class Generator(nn.Module):
         self.sos_id = sos_id
         self.vocab_size = vocab_size
         self.teacher_forcing_ratio = teacher_forcing_ratio
+        self.max_len = max_len
 
         self.encoder = EncoderRNN(vocab_size, max_len-1, hidden_size, 0, enc_dropout, enc_n_layers, True, 'gru', False, None)
         self.decoder = DecoderRNN(vocab_size, max_len-1, hidden_size*2 if dec_bidirectional else hidden_size, sos_id, eou_id, dec_n_layers, 'gru', dec_bidirectional, 0, dec_dropout, True)
@@ -37,8 +40,8 @@ class Generator(nn.Module):
         self.seq2seq = Seq2seq(self.encoder, self.decoder)
 
     def sample(self, src, tgt):
-        sentences, probabilities = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=0, sample=True)
-        return sentences, probabilities
+        sentences, probabilities, hiddens = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=0, sample=True)
+        return sentences, probabilities, hiddens
 
     def forward(self, src, tgt):
         src = src.t()
@@ -62,7 +65,7 @@ class Generator(nn.Module):
         J = 0
         for k in range(sent_len):
             R_k = torch.sum(R_s_w[:,k:], 1)
-            prob = probabilities[:,k+1].log()
+            prob = probabilities[:,k].log()
             J += R_k*prob
 
         loss = -torch.mean(J)
@@ -167,3 +170,48 @@ class Generator(nn.Module):
             loss_per_epoch.append(total_loss)
         torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
         return losses
+
+    def monte_carlo(self, dis, context, seq, hiddens, num_samples):
+
+        """
+        Samples the network using a batch of source input sequence. Passes these inputs
+        through the decoder and instead of taking the top1 (like in forward), sample
+        using the distribution over the vocabulary
+        Inputs: start of sequence, maximum sample sequence length and num of samples
+        Outputs: samples
+        samples: num_samples x max_seq_length (a sampled sequence in each row)
+        Inputs: dialogue context (and maximum sample sequence length
+        Outputs: samples
+            - samples: batch_size x reply_length x num_samples x max_seq_length"""
+
+        # Initialize sample
+        batch_size = seq.size(0)
+        vocab_size = self.decoder.output_size
+        samples = torch.zeros(batch_size, self.max_len)
+        samples_prob = torch.zeros(batch_size, self.max_len)
+        encoder_output, _ = self.encoder(context)
+        rewards = torch.zeros(self.max_len, num_samples, batch_size)
+        function = F.log_softmax
+        for t in range(seq.size(1)):
+            hidden = hiddens[t]     # Hidden state from orignal generated sequence until t
+            output = seq[:,t]
+
+            for i in range(num_samples):
+
+                samples_prob[:,0] = torch.ones(output.size())
+
+                # Pass through decoder and sample from resulting vocab distribution
+                for next_t in range(t+1, self.max_len):
+                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1), hidden, encoder_output,
+                                                                             function=function)
+                    # Sample token for entire batch from predicted vocab distribution
+                    decoder_output = decoder_output.reshape(batch_size, self.vocab_size)
+                    batch_token_sample = torch.multinomial(torch.exp(decoder_output), 1).view(-1)
+                    prob = torch.exp(decoder_output)[np.arange(batch_size), batch_token_sample]
+                    samples_prob[:, next_t] = prob
+                    samples[:, next_t] = batch_token_sample
+                    output = batch_token_sample
+                reward = dis.batchClassify(samples.long()) ## FIX CONTENT
+                rewards[t, i, :] = reward
+        reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
+        return reward_per_word

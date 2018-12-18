@@ -87,7 +87,6 @@ class DecoderRNN(BaseRNN):
         self.embedding = nn.Embedding(self.output_size, self.hidden_size)
         if use_attention:
             self.attention = Attention(self.hidden_size)
-
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
     def forward_step(self, input_var, hidden, encoder_outputs, function):
@@ -161,7 +160,8 @@ class DecoderRNN(BaseRNN):
                 batch_size = inputs.size(0)
                 probabilities = torch.zeros(batch_size, max_length + 1) # Fix for sos token added
                 samples_sent = torch.ones(batch_size, max_length + 1) * self.sos_id
-
+                hiddens = torch.zeros(max_length + 1, 2, batch_size, self.hidden_size)
+                hiddens[0] = decoder_hidden
                 for di in range(max_length):
                     decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
                                                                              function=function)
@@ -170,6 +170,7 @@ class DecoderRNN(BaseRNN):
                     decoder_input = symbols
                     probabilities[:, di + 1] = prob_t.view(-1) # First is Sos
                     samples_sent[:, di + 1] = symbols.view(-1) # First is Sos
+                    hiddens[di + 1] = decoder_hidden
             else:
                 decoder_input = inputs[:, 0].unsqueeze(1)
                 for di in range(max_length):
@@ -182,7 +183,7 @@ class DecoderRNN(BaseRNN):
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
         if sample:
-            return samples_sent, probabilities
+            return samples_sent, probabilities, hiddens
         return decoder_outputs, decoder_hidden, ret_dict
 
     def _init_state(self, encoder_hidden):
