@@ -383,8 +383,8 @@ if __name__ == '__main__':
                         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
                 # Or actor critic step
                 else:
-                    # perplexity = train_generator_PG(context, reply,\
-                    # actor, PG_optimizer,discriminator, NUM_SAMPLES)
+                    perplexity = train_generator_PG(context, reply,\
+                    actor, PG_optimizer,discriminator, NUM_SAMPLES)
 
                     context_MLE, reply_MLE = dataiter.next()
                     train_generator_PG(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actor, PG_optimizer, discriminator, NUM_SAMPLES, TF=1)
