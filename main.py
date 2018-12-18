@@ -32,17 +32,17 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 50
+DIS_TRAIN_EPOCHS = 5
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
-DIS_EMBEDDING_DIM = 64
-DIS_HIDDEN_DIM = 64
+DIS_EMBEDDING_DIM = 128
+DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_CHECKPOINT = None#"discriminator_epoch6_iter.txt"
 GEN_MLE_LR = 1e-3
@@ -317,12 +317,11 @@ def load_data(path='dataset.pickle'):
         corpus = train_data_loader.dataset.corpus
     return corpus,train_data_loader, train_MLE_data_loader
 
-def save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer):
+def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
     torch.save({
                         'epoch': epoch+1,
                         'actor': actor.state_dict(),
                         'act_optimizer' : PG_optimizer.state_dict(),
-                        'act_MLE_optimizer' : actorMLE_optimizer.state_dict(),
                         'dis_optimizer' : dis_optimizer.state_dict(),
                         'discriminator': discriminator.state_dict()
                     },'adversial_checkpoint{}.pth.tar'.format(epoch))
@@ -373,7 +372,6 @@ if __name__ == '__main__':
         actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
             MAX_SEQ_LEN).to(DEVICE)
         actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-        actorMLE_optimizer = optim.Adagrad(actor.parameters(),lr=GEN_MLE_LR)
         discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
         DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
@@ -396,9 +394,8 @@ if __name__ == '__main__':
         # Evaluation
         print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
-            # perform_evaluation(evaluator, actor)
             if epoch % 3 == 0 and epoch > 0:
-                save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
+                save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer)
 
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
@@ -426,4 +423,6 @@ if __name__ == '__main__':
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+            perform_evaluation(evaluator, actor)
+
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")
