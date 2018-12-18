@@ -35,7 +35,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 1
+DIS_TRAIN_EPOCHS = 2
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -44,10 +44,10 @@ DIS_HIDDEN_DIM = 64
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = None
+DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 GEN_MLE_LR = 1e-2
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -263,9 +263,11 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             loss_total.backward()
             dis_opt.step()
             losses.append(loss_total.item())
-    plt.plot(losses)
-    plt.show()
     torch.save(discriminator.state_dict(), "discriminator_final.pth.tar")
+    print(real_r, "Real")
+    print(fake_r, "Fake")
+    plt.plot(losses)
+    plt.savefig("loss_disc_pretrain.png")
 
 def load_data(path='dataset.pickle'):
     """
