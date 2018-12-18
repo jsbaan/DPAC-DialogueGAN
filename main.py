@@ -245,7 +245,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             real_reply = real_reply.to(DEVICE)
 
             # Sample setences
-            fake_reply, _ = gen.sample(context, real_reply)
+            fake_reply, _, _ = gen.sample(context, real_reply)
 
             # Add padding
             fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
