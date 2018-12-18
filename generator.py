@@ -191,7 +191,7 @@ class Generator(nn.Module):
         # Initialize sample
         batch_size = seq.size(0)
         vocab_size = self.decoder.output_size
-        samples = torch.zeros(batch_size, self.max_len)
+        samples = torch.zeros(batch_size, self.max_len).to(DEVICE)
         samples_prob = torch.zeros(batch_size, self.max_len)
         encoder_output, _ = self.encoder(context)
         rewards = torch.zeros(self.max_len, num_samples, batch_size)
@@ -215,7 +215,7 @@ class Generator(nn.Module):
                     samples_prob[:, next_t] = prob
                     samples[:, next_t] = batch_token_sample
                     output = batch_token_sample
-                reward = dis.batchClassify(samples.long()) ## FIX CONTENT
+                reward = dis.batchClassify(samples.long().to(DEVICE)) ## FIX CONTENT
                 rewards[t, i, :] = reward
         reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
         return reward_per_word
