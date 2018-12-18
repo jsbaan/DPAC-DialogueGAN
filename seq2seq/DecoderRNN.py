@@ -143,17 +143,26 @@ class DecoderRNN(BaseRNN):
         # Manual unrolling is used to support random teacher forcing.
         # If teacher_forcing_ratio is True or False instead of a probability, the unrolling can be done in graph
         if use_teacher_forcing:
+            probabilities = torch.zeros(inputs.size(0), max_length + 1)
+            samples_sent = torch.ones(inputs.size(0), max_length + 1) * self.sos_id
+            hiddens = torch.zeros(max_length + 1, 2, batch_size, self.hidden_size)
+            hiddens[0] = decoder_hidden
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
                                                                function=function)
-
+            for i in range(1, probabilities.size(0)):
+                for j in range(1, probabilities.size(1)):
+                    probabilities[i, j] = decoder_output[i, j-1, inputs[i, j]].exp()
             for di in range(decoder_output.size(1)):
                 step_output = decoder_output[:, di, :]
                 if attn is not None:
                     step_attn = attn[:, di, :]
                 else:
                     step_attn = None
-                decode(di, step_output, step_attn)
+                symbols, probs = decode(di, step_output, step_attn, sample=sample)
+                # probabilities[:, di + 1] = probs.view(-1)
+                samples_sent[:, di + 1] = symbols.view(-1)
+                hiddens[di + 1] = decoder_hidden
         else:
             if sample:
                 decoder_input = inputs[:, 0].unsqueeze(1)
@@ -182,7 +191,9 @@ class DecoderRNN(BaseRNN):
 
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
-        if sample:
+        if sample and not use_teacher_forcing:
+            return samples_sent, probabilities, hiddens
+        elif sample and use_teacher_forcing:
             return samples_sent, probabilities, hiddens
         return decoder_outputs, decoder_hidden, ret_dict
 

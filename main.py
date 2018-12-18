@@ -60,18 +60,15 @@ BATCH_SIZE_TESTING = 256
 NUM_SAMPLES = 3
 # Number of gen
 
-def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples):
+def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples, TF=0):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
     Training is done for one batch.
     """
     # Forward passdis, context, seq, hiddens, num_samples # I am a nice person
-    fake_reply, word_probabilities, hiddens = gen.sample(context, reply)
-
-    # print("Generated reply")
-    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
-    # print("Real  reply")
-    # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
+    fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
+    if TF == 1:
+        fake_reply = reply
 
     # Compute word-level rewards
     rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
@@ -386,12 +383,11 @@ if __name__ == '__main__':
                         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
                 # Or actor critic step
                 else:
-                    perplexity = train_generator_PG(context, reply,\
-                    actor, PG_optimizer,discriminator, NUM_SAMPLES)
+                    # perplexity = train_generator_PG(context, reply,\
+                    # actor, PG_optimizer,discriminator, NUM_SAMPLES)
 
-                ## MLE step
-                context_MLE, reply_MLE = dataiter.next()
-                actor.train_generator_MLE_batch(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actorMLE_optimizer, PAD)
+                    context_MLE, reply_MLE = dataiter.next()
+                    train_generator_PG(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actor, PG_optimizer, discriminator, NUM_SAMPLES, TF=1)
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
