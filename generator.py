@@ -206,7 +206,7 @@ class Generator(nn.Module):
 
                 # Pass through decoder and sample from resulting vocab distribution
                 for next_t in range(t+1, self.max_len):
-                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).to(DEVICE), hidden.to(DEVICE_, encoder_output.to(DEVICE)),
+                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).to(DEVICE), hidden.to(DEVICE), encoder_output.to(DEVICE),
                                                                              function=function)
                     # Sample token for entire batch from predicted vocab distribution
                     decoder_output = decoder_output.reshape(batch_size, self.vocab_size)
