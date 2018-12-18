@@ -74,7 +74,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples):
     # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
 
     # Compute word-level rewards
-    rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples)
+    rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples).detach()
 
     # Compute REINFORCE loss with the assumption that G = R_t
     pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
