@@ -263,7 +263,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             loss_total.backward()
             dis_opt.step()
             losses.append(loss_total.item())
-    torch.save(discriminator.state_dict(), "discriminator_final.pth.tar")
+    torch.save(dis.state_dict(), "discriminator_final.pth.tar")
     print(real_r, "Real")
     print(fake_r, "Fake")
     plt.plot(losses)
