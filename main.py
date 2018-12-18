@@ -366,9 +366,7 @@ if __name__ == '__main__':
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
         # Evaluation
-        print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
-            perform_evaluation(evaluator, actor)
             if epoch % 3 == 0 and epoch > 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
@@ -395,4 +393,6 @@ if __name__ == '__main__':
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+            perform_evaluation(evaluator, actor)
+
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")
