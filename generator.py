@@ -200,8 +200,8 @@ class Generator(nn.Module):
             # Hidden state from orignal generated sequence until t
             for n in range(num_samples):
                 samples = reply.clone()
-                hidden = hiddens[t]
-                output = reply[:,t]
+                hidden = hiddens[t].to(DEVICE)
+                output = reply[:,t].to(DEVICE)
                 # samples_prob[:,0] = torch.ones(output.size())
                 # Pass through decoder and sample from resulting vocab distribution
                 for next_t in range(t+1, self.max_len):
