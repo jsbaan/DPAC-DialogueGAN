@@ -252,7 +252,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
             # Get probabilities/rewards for real/fake
             real_r = dis.batchClassify(real_reply)
-            fake_r = dis.batchClassify(fake_reply)
+            fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
             # Learn with fake_r 
             dis_opt.zero_grad()
