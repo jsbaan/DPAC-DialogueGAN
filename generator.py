@@ -175,7 +175,7 @@ class Generator(nn.Module):
         torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
         return losses
 
-    def monte_carlo(self, dis, context, seq, hiddens, num_samples):
+    def monte_carlo(self, dis, context, reply, hiddens, num_samples, corpus):
 
         """
         Samples the network using a batch of source input sequence. Passes these inputs
@@ -189,33 +189,32 @@ class Generator(nn.Module):
             - samples: batch_size x reply_length x num_samples x max_seq_length"""
 
         # Initialize sample
-        batch_size = seq.size(0)
+        batch_size = reply.size(0)
         vocab_size = self.decoder.output_size
-        samples = torch.zeros(batch_size, self.max_len).to(DEVICE)
-        samples_prob = torch.zeros(batch_size, self.max_len)
+        # samples_prob = torch.zeros(batch_size, self.max_len)
         encoder_output, _ = self.encoder(context)
         rewards = torch.zeros(self.max_len, num_samples, batch_size)
         function = F.log_softmax
-        for t in range(seq.size(1)):
-            hidden = hiddens[t]     # Hidden state from orignal generated sequence until t
-            output = seq[:,t]
-
-            for i in range(num_samples):
-
-                samples_prob[:,0] = torch.ones(output.size())
-
+        reply = reply.to(DEVICE)
+        for t in range(reply.size(1)):
+            # Hidden state from orignal generated sequence until t
+            for n in range(num_samples):
+                samples = reply.clone()
+                hidden = hiddens[t]
+                output = reply[:,t]
+                # samples_prob[:,0] = torch.ones(output.size())
                 # Pass through decoder and sample from resulting vocab distribution
                 for next_t in range(t+1, self.max_len):
-                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).to(DEVICE), hidden.to(DEVICE), encoder_output.to(DEVICE),
+                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).long(), hidden, encoder_output,
                                                                              function=function)
                     # Sample token for entire batch from predicted vocab distribution
                     decoder_output = decoder_output.reshape(batch_size, self.vocab_size)
                     batch_token_sample = torch.multinomial(torch.exp(decoder_output), 1).view(-1)
-                    prob = torch.exp(decoder_output)[np.arange(batch_size), batch_token_sample]
-                    samples_prob[:, next_t] = prob
+                    # prob = torch.exp(decoder_output)[np.arange(batch_size), batch_token_sample]
+                    # samples_prob[:, next_t] = prob
                     samples[:, next_t] = batch_token_sample
                     output = batch_token_sample
                 reward = dis.batchClassify(samples.long().to(DEVICE)) ## FIX CONTENT
-                rewards[t, i, :] = reward
+                rewards[t, n, :] = reward
         reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
         return reward_per_word

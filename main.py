@@ -47,7 +47,7 @@ PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
+DISCRIMINATOR_CHECKPOINT = None
 GEN_MLE_LR = 1e-2
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -65,7 +65,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples):
     The generator is trained using policy gradients, using the reward from the discriminator.
     Training is done for one batch.
     """
-    # Forward passdis, context, seq, hiddens, num_samples
+    # Forward passdis, context, seq, hiddens, num_samples # I am a nice person
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply)
 
     # print("Generated reply")
@@ -74,7 +74,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples):
     # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
 
     # Compute word-level rewards
-    rewards = gen.monte_carlo(dis, context, reply, hiddens, num_samples).detach()
+    rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
 
     # Compute REINFORCE loss with the assumption that G = R_t
     pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
