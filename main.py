@@ -48,11 +48,11 @@ PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_CHECKPOINT = None
-GEN_MLE_LR = 1e-3
-DISCRIMINATOR_MLE_LR = 1e-3
-ACTOR_LR = 1e-3
-CRITIC_LR = 1e-3
-DISCRIMINATOR_LR = 1e-3
+GEN_MLE_LR = 1e-2
+DISCRIMINATOR_MLE_LR = 1e-2
+ACTOR_LR = 1e-2
+CRITIC_LR = 1e-2
+DISCRIMINATOR_LR = 1e-2
 AC = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -368,14 +368,12 @@ if __name__ == '__main__':
         # Evaluation
         print("Pretrained evaluation")
         for epoch in range(ADV_TRAIN_EPOCHS):
-            # perform_evaluation(evaluator, actor)
+            perform_evaluation(evaluator, actor)
             if epoch % 3 == 0 and epoch > 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
 
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-
-
 
             sys.stdout.flush()
             for (batch, (context, reply)) in enumerate(train_data_loader):
