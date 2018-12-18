@@ -9,6 +9,10 @@ import sys
 import time
 from torch.nn.utils import clip_grad_norm_
 import numpy as np
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda:0')
+else:
+    DEVICE = torch.device('cpu')  #'cuda:0'
 
 class Generator(nn.Module):
     def __init__(
@@ -202,7 +206,7 @@ class Generator(nn.Module):
 
                 # Pass through decoder and sample from resulting vocab distribution
                 for next_t in range(t+1, self.max_len):
-                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1), hidden, encoder_output,
+                    decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).to(DEVICE), hidden.to(DEVICE_, encoder_output.to(DEVICE)),
                                                                              function=function)
                     # Sample token for entire batch from predicted vocab distribution
                     decoder_output = decoder_output.reshape(batch_size, self.vocab_size)
