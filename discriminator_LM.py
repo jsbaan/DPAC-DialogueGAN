@@ -94,7 +94,7 @@ class Discriminator(nn.Module):
             rewards[:, t] = torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)      
 
 
-        return rewards
+        return -rewards
 
 
     def get_reward(self, history, word):
@@ -106,7 +106,7 @@ class Discriminator(nn.Module):
         reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
         reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
 
-        return reward
+        return -reward
 
 
 
