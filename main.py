@@ -373,6 +373,8 @@ if __name__ == '__main__':
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
             sys.stdout.flush()
+            perform_evaluation(evaluator, actor)
+
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
                 reply = reply.to(DEVICE)
@@ -391,6 +393,5 @@ if __name__ == '__main__':
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)
-            perform_evaluation(evaluator, actor)
 
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")

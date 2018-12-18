@@ -159,10 +159,13 @@ class DecoderRNN(BaseRNN):
                     step_attn = attn[:, di, :]
                 else:
                     step_attn = None
-                symbols, probs = decode(di, step_output, step_attn, sample=sample)
+                if sample:
+                    symbols, probs = decode(di, step_output, step_attn, sample=sample)
                 # probabilities[:, di + 1] = probs.view(-1)
-                samples_sent[:, di + 1] = symbols.view(-1)
-                hiddens[di + 1] = decoder_hidden
+                    samples_sent[:, di + 1] = symbols.view(-1)
+                    hiddens[di + 1] = decoder_hidden
+                else:
+                    decode(di, step_output, step_attn)
         else:
             if sample:
                 decoder_input = inputs[:, 0].unsqueeze(1)
