@@ -144,17 +144,23 @@ class DecoderRNN(BaseRNN):
         # Manual unrolling is used to support random teacher forcing.
         # If teacher_forcing_ratio is True or False instead of a probability, the unrolling can be done in graph
         if use_teacher_forcing:
+            probabilities = torch.zeros(inputs.size(0), max_length + 1) # Fix for sos token added
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
                                                                function=function)
-
             for di in range(decoder_output.size(1)):
                 step_output = decoder_output[:, di, :]
                 if attn is not None:
                     step_attn = attn[:, di, :]
                 else:
                     step_attn = None
-                decode(di, step_output, step_attn)
+                if sample:
+                    _,prob_t = decode(di, step_output, step_attn,sample=sample)
+                    probabilities[:, di + 1] = prob_t.view(-1) # First is Sos
+                else:
+                    decode(di, step_output, step_attn,sample=sample)
+
+
         else:
             if sample:
                 decoder_input = inputs[:, 0].unsqueeze(1)
@@ -181,8 +187,11 @@ class DecoderRNN(BaseRNN):
 
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
-        if sample:
+        if sample and not use_teacher_forcing:
             return samples_sent, probabilities
+        elif sample and use_teacher_forcing:
+            return None, probabilities
+
         return decoder_outputs, decoder_hidden, ret_dict
 
     def _init_state(self, encoder_hidden):

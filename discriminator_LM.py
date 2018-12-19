@@ -17,33 +17,27 @@ class Discriminator(nn.Module):
         self.device = device
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru_response = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
-        self.gru2hidden = nn.Linear(hidden_dim, hidden_dim)
-        self.dropout_linear = nn.Dropout(p=dropout)
+        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
+        self.dropout = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
 
 
     def init_hidden(self, batch_size):
         h = autograd.Variable(torch.zeros(2*1, batch_size, self.hidden_dim))
-
         return h.to(self.device)
 
-    def forward(self, response, hidden_response):
-        # input dim                                                         # batch_size x seq_len
-        # batch_size x 4 x hidden_dim
-        emb_response = self.embeddings(response.to(self.device)) # batchsize x embedding dim
-        emb_response = emb_response.permute(1, 0, 2)
-        _, hidden_response = self.gru_response(emb_response, hidden_response)
-        hidden_response = hidden_response.permute(1, 0, 2).contiguous()
-        out = self.gru2hidden(hidden_response[:, -1, :])             # batch_size x 4*hidden_dim
+    def forward(self, input, hidden):
+        embedding = self.embeddings(input.to(self.device)) # batchsize x embedding dim
+        embedding = embedding.permute(1, 0, 2)
+        out, hidden = self.gru(embedding, hidden)
+        out = out[-1,:,:] # Take the output for the last token
         out = torch.tanh(out)
-        out = self.dropout_linear(out)
-        out = self.hidden2out(out)                                          # batch_size x 1
+        out = self.dropout(out)
+        out = self.hidden2out(out)
         out = torch.softmax(out, dim=1)
+        return out.squeeze()
 
-        return out
-
-    def batchClassify(self, response):
+    def batchClassify(self, input):
         """
         Classifies a batch of sequences.
 
@@ -54,9 +48,9 @@ class Discriminator(nn.Module):
             - out: batch_size ([0,1] score)
         """
 
-        h_response = self.init_hidden(response.size()[0])
-        out = self.forward(response, h_response)
-        return out
+        h_response = self.init_hidden(input.size()[0])
+        output = self.forward(input, h_response)
+        return output
 
     def batchBCELoss(self, inp, target):
         """
@@ -80,42 +74,26 @@ class Discriminator(nn.Module):
         for t in range(max_seq_len-1): ## CANNOT PREDICT NEXT WORD FOR LAST ONE
             inp = reply[np.arange(batch_size), :t+1]
             target = reply[np.arange(batch_size), t+1]
-            output = self.batchClassify(inp.long())
-            reward = output.gather(1, target.type(torch.LongTensor).unsqueeze(1).to(self.device))
+
+            vocab_distr = self.batchClassify(inp.long())
+            reward = vocab_distr.gather(1, target.type(torch.LongTensor).unsqueeze(1).to(self.device))
 
             mask = torch.zeros(batch_size)
-            for i in range(batch_size):   
+            for i in range(batch_size):
                 if target[i].item() != ignore_index:
                     mask[i] = 1.0
                 else:
                     break
 
-            # rewards[:, t] = -criterion(output, target.long().to(self.device)) 
-            rewards[:, t] = torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)      
-
-
+            # rewards[:, t] = -criterion(output, target.long().to(self.device))
+            rewards[:, t] = -torch.log(reward.squeeze() + 1e-12) * mask.to(self.device)
         return rewards
-
 
     def get_reward(self, history, word):
         """
         Calculate reward for a new word based on the history
         """
-
         output = self.batchClassify(history.long())
         reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
-        reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
-
+        reward = -torch.log(reward.squeeze() + 1e-12) # prevent taking the log of zero
         return reward
-
-
-
-
-
-
-
-
-
-
-
-
