@@ -54,11 +54,11 @@ ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
 AC = False
-SEQGAN = True
+SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint3.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -304,13 +304,13 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
                 fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
                 real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
-                
+
                 # Get probabilities/rewards for real/fake
                 real_r = dis.batchClassify(real_reply, context)
                 fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
                 # Learn with fake_r
-                
+
                 loss_fake = loss(fake_r, fake_labels)
 
                 loss_real = loss(real_r, real_labels)
