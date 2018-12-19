@@ -45,8 +45,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -354,7 +354,11 @@ if __name__ == '__main__':
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
         # Initialize discriminator
-        dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        if SEQGAN:
+            discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
+                DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        else:
+            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
