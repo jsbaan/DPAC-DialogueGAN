@@ -75,7 +75,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
 
     if TF==1:
-        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1)
+        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
 
     # Compute word-level rewards
     elif SEQGAN:
