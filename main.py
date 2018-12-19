@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -456,8 +456,8 @@ if __name__ == '__main__':
             print('Iteration {}'.format(n))
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
-            if n % num_batches == 0:
-                perform_evaluation(evaluator, actor)
+            # if n % num_batches == 0:
+                # perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
