@@ -156,9 +156,9 @@ class DecoderRNN(BaseRNN):
                     step_attn = None
                 if sample:
                     _,prob_t = decode(di, step_output, step_attn,sample=sample)
+                    probabilities[:, di + 1] = prob_t.view(-1) # First is Sos
                 else:
                     decode(di, step_output, step_attn,sample=sample)
-                probabilities[:, di + 1] = prob_t.view(-1) # First is Sos
 
 
         else:
