@@ -355,7 +355,7 @@ if __name__ == '__main__':
         print('\nStarting Discriminator MLE Training...')
         # Initialize discriminator
         if SEQGAN:
-            discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
+            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
             dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
