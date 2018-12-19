@@ -210,15 +210,15 @@ class Generator(nn.Module):
                 # Pass through decoder and sample from resulting vocab distribution
                 for next_t in range(t+1, self.max_len):
                     decoder_output, hidden, step_attn = self.decoder.forward_step(output.reshape(-1, 1).long(), hidden, encoder_output,
-                                                                             function=function)
+                                                                             function=function).detach()
                     # Sample token for entire batch from predicted vocab distribution
-                    decoder_output = decoder_output.reshape(batch_size, self.vocab_size)
+                    decoder_output = decoder_output.reshape(batch_size, self.vocab_size).detach()
                     batch_token_sample = torch.multinomial(torch.exp(decoder_output), 1).view(-1)
                     # prob = torch.exp(decoder_output)[np.arange(batch_size), batch_token_sample]
                     # samples_prob[:, next_t] = prob
                     samples[:, next_t] = batch_token_sample
                     output = batch_token_sample
-                reward = dis.batchClassify(samples.long().to(DEVICE), context.long().to(DEVICE)) ## FIX CONTENT
+                reward = dis.batchClassify(samples.long().to(DEVICE), context.long().to(DEVICE)).detach() ## FIX CONTENT
                 rewards[t, n, :] = reward
         reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
         return reward_per_word
