@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -56,7 +56,7 @@ DISCRIMINATOR_LR = 1e-2
 AC = False
 SEQGAN = True
 if SEQGAN:
-    DISCRIMINATOR_CHECKPOINT = None#"discriminator_final.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
     DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint3.pth.tar"
 
