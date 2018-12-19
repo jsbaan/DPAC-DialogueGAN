@@ -57,7 +57,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = None#"discriminator_checkpoint0.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint0.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -225,18 +225,25 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
     fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
     # Get probabilities/rewards for real/fake
-    real_r = dis.batchClassify(real_reply)
-    fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+    if SEQGAN:
+        real_r = dis.batchClassify(real_reply.to(DEVICE))
+        fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+        # Learn with fake_r
+        dis_opt.zero_grad()
+        loss_fake = loss(fake_r, fake_labels)
 
-    # Learn with fake_r
-    dis_opt.zero_grad()
-    loss_fake = loss(fake_r, fake_labels)
+        loss_real = loss(real_r, real_labels)
+        loss_total = loss_real + loss_fake
+        loss_total.backward()
+        dis_opt.step()
 
-    loss_real = loss(real_r, real_labels)
-    loss_total = loss_real + loss_fake
-    loss_total.backward()
+    else:
+        real_r = calc_mean(dis.get_rewards(real_reply.to(DEVICE),PAD))
+        fake_r = calc_mean(dis.get_rewards(fake_reply.to(DEVICE),PAD))
+        loss = -(real_r - fake_r)
+        loss.backward()
+        dis_opt.step()
 
-    dis_opt.step()
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
@@ -358,7 +365,7 @@ if __name__ == '__main__':
             dis = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
-            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+            dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
@@ -402,7 +409,6 @@ if __name__ == '__main__':
         dis_data_loader = iter(load_data())
         num_batches = len(gen_data_loader)
         N = ADV_TRAIN_EPOCHS * num_batches
-        print(N)
         M = 1
         K = 5
         for n in range(N):
