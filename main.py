@@ -325,10 +325,10 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             dis_opt.step()
 
             
-    plt.plot(real_list, label='real')
-    plt.plot(fake_list, label='fake')
-    plt.legend()
-    plt.show()
+            plt.plot(real_list, label='real')
+            plt.plot(fake_list, label='fake')
+            plt.legend()
+            plt.savefig('real/fake rewards')
 
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
     print(real_r, "Real")
