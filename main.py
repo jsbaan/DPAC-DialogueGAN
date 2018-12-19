@@ -48,13 +48,17 @@ PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = None#"discriminator_checkpoint3.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-3
 ACTOR_LR = 1e-3
 CRITIC_LR = 1e-3
 DISCRIMINATOR_LR = 1e-3
 AC = False
 SEQGAN = False
+if SEQGAN:
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
+else:
+    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint3.pth.tar"
+
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
@@ -396,7 +400,7 @@ if __name__ == '__main__':
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
             sys.stdout.flush()
-            # perform_evaluation(evaluator, actor)
+            perform_evaluation(evaluator, actor)
 
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
