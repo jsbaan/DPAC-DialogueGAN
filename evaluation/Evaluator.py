@@ -2,7 +2,7 @@ from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
-from nlgeval import NLGEval
+# from nlgeval import NLGEval
 from evaluation.embedding_metrics import *
 import torch
 from torchnlp.metrics import *
