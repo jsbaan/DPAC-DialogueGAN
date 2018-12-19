@@ -8,9 +8,9 @@ class DPDataset(Dataset):
         self.contexts = []
         self.replies = []
         for dialog in dialogs:
-            max_start_i = len(dialog) - context_size - 1
+            max_start_i = len(dialog) - context_size
             for start_i in range(max_start_i):
-                reply = dialog[start_i + context_size + 1]
+                reply = dialog[start_i + context_size]
                 context = []
                 for i in range(start_i, start_i+context_size):
                     context.extend(dialog[i])
@@ -18,7 +18,7 @@ class DPDataset(Dataset):
                 if (min_reply_length is None or len(reply) >= min_reply_length) and \
                         (max_reply_length is None or len(reply) <= max_reply_length):
                     self.contexts.append(context)
-                    self.replies.append(dialog[start_i + context_size + 1])
+                    self.replies.append(reply)
 
     def __len__(self):
         return len(self.contexts)
