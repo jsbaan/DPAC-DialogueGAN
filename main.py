@@ -396,7 +396,7 @@ if __name__ == '__main__':
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
             sys.stdout.flush()
-            # perform_evaluation(evaluator, actor)
+            perform_evaluation(evaluator, actor)
 
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
