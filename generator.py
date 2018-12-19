@@ -62,6 +62,8 @@ class Generator(nn.Module):
 
         # NOTICE THAT DISCOUNT FACTOR is 1
     def compute_reinforce_loss(self, rewards, probabilities):
+        rewards = rewards.to(DEVICE)
+        probabilities = probabilities.to(DEVICE)
         sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
         R_s_w = torch.mul(rewards, sentence_level_reward)
 
