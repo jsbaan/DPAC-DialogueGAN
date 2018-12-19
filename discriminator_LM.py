@@ -49,7 +49,7 @@ class Discriminator(nn.Module):
         """
 
         h_response = self.init_hidden(input.size()[0])
-        output = self.forward(input, h_response)
+        output = self.forward(input.long(), h_response)
         return output
 
     def batchBCELoss(self, inp, target):
@@ -86,7 +86,7 @@ class Discriminator(nn.Module):
                     break
 
             # rewards[:, t] = -criterion(output, target.long().to(self.device))
-            rewards[:, t] = -torch.log(reward.squeeze() + 1e-12) * mask.to(self.device)
+            rewards[:, t] = torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)
         return rewards
 
     def get_reward(self, history, word):
@@ -95,5 +95,5 @@ class Discriminator(nn.Module):
         """
         output = self.batchClassify(history.long())
         reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
-        reward = -torch.log(reward.squeeze() + 1e-12) # prevent taking the log of zero
+        reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
         return reward
