@@ -2,9 +2,10 @@ from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
-# from nlgeval import NLGEval
+from nlgeval import NLGEval
 from evaluation.embedding_metrics import *
 import torch
+from torchnlp.metrics import *
 
 import word2vec
 
@@ -65,8 +66,10 @@ class Evaluator:
     def evaluate_nlg(self, model):
         real_replies, generated_replies = self.get_replies(model)
 
+        # real_replies = [[r] for r in real_replies]
+
         eval = NLGEval()
-        return eval.compute_individual_metrics(ref=real_replies, hyp=generated_replies)
+        return eval.compute_metrics(real_replies, generated_replies)
 
     def get_replies(self, model):
         real_replies = []
@@ -74,7 +77,7 @@ class Evaluator:
 
         for (iter, (context, reply)) in enumerate(self.data_loader):
             # if self.log:
-            #     print(str(iter + 1) + '/' + str(len(self.data_loader)))
+            # print(str(iter + 1) + '/' + str(len(self.data_loader)))
             context = context.permute(1, 0).to(self.device)
             reply = reply.permute(1, 0).to(self.device)
             output = model(context, reply)
@@ -107,7 +110,7 @@ class Evaluator:
 
     def get_word2vec(self, embedding_model, replies):
         path = os.path.dirname(os.path.realpath(__file__))
-        w2v = word2vec.load(path + 'word2vec.bin')
+        w2v = word2vec.load(path + '/word2vec.bin')
 
         #torchwordemb.load_word2vec_bin('GoogleNews-vectors-negative300.bin')
         # word2vec = {}
