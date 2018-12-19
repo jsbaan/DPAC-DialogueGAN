@@ -28,10 +28,7 @@ Bootstrapping Dialog Systems with Word Embeddings. G. Forgues, J. Pineau, J. Lar
 __docformat__ = 'restructedtext en'
 __authors__ = ("Chia-Wei Liu", "Iulian Vlad Serban")
 
-from random import randint
-from gensim.models import Word2Vec
 import numpy as np
-import argparse
 
 def greedy_match(fileone, filetwo, w2v):
     res1 = greedy_score(fileone, filetwo, w2v)
@@ -178,24 +175,4 @@ def average(fileone, filetwo, w2v):
 
     scores = np.asarray(scores)
     return np.mean(scores), 1.96*np.std(scores)/float(len(scores)), np.std(scores)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('ground_truth', help="ground truth text file, one example per line")
-    parser.add_argument('predicted', help="predicted text file, one example per line")
-    parser.add_argument('embeddings', help="embeddings bin file")
-    args = parser.parse_args()
-
-    # print "loading embeddings file..."
-    w2v = Word2Vec.load_word2vec_format(args.embeddings, binary=True)
-
-    r = average(args.ground_truth, args.predicted, w2v)
-    print("Embedding Average Score: %f +/- %f ( %f )" %(r[0], r[1], r[2]))
-
-    r = greedy_match(args.ground_truth, args.predicted, w2v)
-    print("Greedy Matching Score: %f +/- %f ( %f )" %(r[0], r[1], r[2]))
-
-    r = extrema_score(args.ground_truth, args.predicted, w2v)
-    print("Extrema Score: %f +/- %f ( %f )" %(r[0], r[1], r[2]))
 
