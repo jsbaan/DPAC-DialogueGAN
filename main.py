@@ -37,7 +37,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 5
+DIS_TRAIN_EPOCHS = 20
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -48,7 +48,7 @@ CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = True
 POLICY_GRADIENT = False
-ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
+ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
@@ -287,24 +287,30 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
         total_loss = 0
         loss = nn.BCELoss()
         for (iter, (context, real_reply)) in enumerate(train_data_loader):
-            fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
-            real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
+
             context = context.to(DEVICE)
             real_reply = real_reply.to(DEVICE)
 
+            dis_opt.zero_grad()
+
             # Sample setences
-            fake_reply, _, _ = gen.sample(context, real_reply)
+            with torch.no_grad():
+                fake_reply, _, _ = gen.sample(context, real_reply)
 
             # Add padding
-            fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
+            fake_reply = fill_with_padding(fake_reply, EOU, PAD)
 
             if SEQGAN:
+
+                fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
+                real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
+                
                 # Get probabilities/rewards for real/fake
                 real_r = dis.batchClassify(real_reply)
                 fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
                 # Learn with fake_r
-                dis_opt.zero_grad()
+                
                 loss_fake = loss(fake_r, fake_labels)
 
                 loss_real = loss(real_r, real_labels)
@@ -320,8 +326,13 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 loss = -(real_rewards - fake_rewards)
                 loss.backward()
                 losses.append(loss.item())
-                real_list.append(real_rewards)
-                fake_list.append(fake_rewards)
+
+                if iter % 20 == 0:
+                    print("real ", real_rewards)
+                    print("fake ", fake_rewards)
+                    real_list.append(real_rewards)
+                    fake_list.append(fake_rewards)
+
             dis_opt.step()
 
 
