@@ -57,7 +57,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint0.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint3.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
