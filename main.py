@@ -53,7 +53,7 @@ ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
 AC = False
-SEQGAN = True
+SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
@@ -248,16 +248,18 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
             fake_reply, _= gen.sample(context, real_reply)
         fake_reply = fill_with_padding(fake_reply, EOU, PAD)
 
-        real_r = dis.get_rewards(real_reply, PAD)
-        fake_r = dis.get_rewards(fake_reply, PAD)
+        real_r = dis.get_rewards(real_reply.to(DEVICE), PAD)
+        fake_r = dis.get_rewards(fake_reply.to(DEVICE), PAD)
 
         real_rewards = calc_mean(real_r)
         fake_rewards = calc_mean(fake_r)
 
         loss = -(real_rewards - fake_rewards)
-
         loss.backward()
+
         dis_opt.step()
+
+
 
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
@@ -328,23 +330,22 @@ def load_data(path='dataset.pickle'):
     Load data set
     """
     if not os.path.isfile(path):
-        print("Saving the data set")
+        # print("Saving the data set")
         corpus = DPCorpus(vocabulary_limit=VOCAB_SIZE)
         train_dataset = corpus.get_train_dataset(min_reply_length=MIN_SEQ_LEN,\
             max_reply_length=MAX_SEQ_LEN)
-        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
-        train_MLE_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
 
         with open(path, 'wb') as handle:
-            pickle.dump(train_data_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            corpus = train_data_loader.dataset.corpus
+            pickle.dump(train_dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+
     else:
-        print("Loading the data set")
+        # print("Loading the data set")
         with open(path, 'rb') as handle:
-            train_data_loader= pickle.load(handle)
-        train_MLE_data_loader = DPDataLoader(train_data_loader.dataset, batch_size=BATCH_SIZE)
-        corpus = train_data_loader.dataset.corpus
-    return corpus,train_data_loader, train_MLE_data_loader
+            train_dataset = pickle.load(handle)
+        train_data_loader = DPDataLoader(train_dataset, batch_size=BATCH_SIZE)
+    return train_data_loader
 
 def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
     torch.save({
@@ -372,7 +373,8 @@ if __name__ == '__main__':
     and then uses PG to alternately train them.
     '''
     # Load data set
-    corpus, train_data_loader, MLE_data_loader = load_data()
+    train_data_loader = load_data()
+    corpus = train_data_loader.dataset.corpus
     SOS = train_data_loader.dataset.corpus.token_to_id(DPCorpus.SOS)
     EOU = train_data_loader.dataset.corpus.token_to_id(DPCorpus.EOU)
     PAD = train_data_loader.dataset.corpus.token_to_id(DPCorpus.PAD)
@@ -391,7 +393,7 @@ if __name__ == '__main__':
             dis = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
-            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+            dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
@@ -429,37 +431,50 @@ if __name__ == '__main__':
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
 
-        # Evaluation
-        for epoch in range(ADV_TRAIN_EPOCHS):
-            if epoch % 1 == 0 and epoch > 0:
-                save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer)
-            print("Evaluating: ")
-            perform_evaluation(evaluator, actor)
+        # Adversarial training loop
+        gen_data_loader = iter(load_data())
+        gen_data_loader_tf = iter(load_data())
+        dis_data_loader = iter(load_data())
+        num_batches = len(gen_data_loader)
+        N = ADV_TRAIN_EPOCHS * num_batches
+        M = 1
+        K = 5
+        for n in range(N):
+            print('Iteration {}'.format(n))
+            if n % num_batches == 0 and n > 0:
+                save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
+            if n % num_batches == 0:
+                perform_evaluation(evaluator, actor)
 
-            dataiter = iter(MLE_data_loader)
-            print('\n--------\nEPOCH %d\n--------' % (epoch+1))
-
-            sys.stdout.flush()
-
-            for (batch, (context, reply)) in enumerate(train_data_loader):
-                context = context.to(DEVICE)
-                reply = reply.to(DEVICE)
-                # TRAIN GENERATOR (ACTOR)
+            # TRAIN GENERATOR (ACTOR)
+            for m in range(M):
+                try:
+                    context,reply = gen_data_loader.next()
+                except StopIteration:
+                    gen_data_loader = iter(load_data())
                 # AC step
                 if AC:
-                    perplexity = train_generator_PGAC(context, reply,\
+                    perplexity = train_generator_PGAC(context.to(DEVICE), reply.to(DEVICE),\
                         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
                 # PG step
                 else:
-                    perplexity = train_generator_PG(context, reply,\
+                    perplexity = train_generator_PG(context.to(DEVICE), reply.to(DEVICE),\
                         actor, PG_optimizer,discriminator,num_samples=NUM_SAMPLES)
 
                     # Teacher forcing
-                    real_context, real_reply = dataiter.next()
-                    perplexity = train_generator_PG(real_context.to(DEVICE), real_reply.to(DEVICE), \
+                    try:
+                        context, reply = gen_data_loader_tf.next()
+                    except:
+                        gen_data_loader_tf = iter(load_data())
+                    perplexity = train_generator_PG(context.to(DEVICE), reply.to(DEVICE), \
                         actor, PG_optimizer, discriminator, num_samples=NUM_SAMPLES,TF=1)
 
-                # TRAIN DISCRIMINATOR
-                train_discriminator(context,reply, actor, discriminator, dis_optimizer)
+            # TRAIN DISCRIMINATOR
+            for k in range(K):
+                try:
+                    context, reply = dis_data_loader.next()
+                except StopIteration:
+                    dis_data_loader = iter(load_data())
+                train_discriminator(context.to(DEVICE),reply.to(DEVICE), actor, discriminator, dis_optimizer)
 
     print("DO NOT FORGET TO SAVE YOUR DATA IF YOU ARE RUNNING IN COLLAB")
