@@ -86,7 +86,7 @@ class Discriminator(nn.Module):
                     break
 
             # rewards[:, t] = -criterion(output, target.long().to(self.device))
-            rewards[:, t] = torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)
+            rewards[:, t] = torch.log(reward.squeeze() + 1e-12) * mask.to(self.device)
         return rewards
 
     def get_reward(self, history, word):
