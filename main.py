@@ -246,7 +246,7 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
         dis_opt.zero_grad()
 
         with torch.no_grad():
-            fake_reply, _= gen.sample(context, real_reply)
+            fake_reply, _,_= gen.sample(context, real_reply)
         fake_reply = fill_with_padding(fake_reply, EOU, PAD)
 
         real_r = dis.get_rewards(real_reply.to(DEVICE), PAD)
@@ -456,8 +456,8 @@ if __name__ == '__main__':
             print('Iteration {}'.format(n))
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
-            # if n % num_batches == 0:
-                # perform_evaluation(evaluator, actor)
+            if n % num_batches == 0:
+                perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
