@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
 
 import discriminator
+import discriminator_LM
 import critic
 
 from helpers import *
@@ -53,7 +54,7 @@ ACTOR_LR = 1e-3
 CRITIC_LR = 1e-3
 DISCRIMINATOR_LR = 1e-3
 AC = False
-SEQGAN = True
+SEQGAN = False
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
@@ -67,19 +68,17 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     """
 
     # Forward pass
-    fake_reply, word_probabilities = gen.sample(context, reply, TF=TF)
+    fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
 
     if TF==1:
-        fake_reply = reply
+        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1)
+
     # Compute word-level rewards
-    if SEQGAN:
+    elif SEQGAN:
         rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
     else:
         # Compute word-level rewards
         rewards = dis.get_rewards(fake_reply, PAD)
-
-
-
 
     # Compute perplexity
     entropy = torch.mean(word_probabilities.log(), dim=1)
