@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -246,7 +246,7 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
         dis_opt.zero_grad()
 
         with torch.no_grad():
-            fake_reply, _= gen.sample(context, real_reply)
+            fake_reply, _,_= gen.sample(context, real_reply)
         fake_reply = fill_with_padding(fake_reply, EOU, PAD)
 
         real_r = dis.get_rewards(real_reply.to(DEVICE), PAD)
@@ -324,7 +324,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 fake_list.append(fake_rewards)
             dis_opt.step()
 
-            
+
     plt.plot(real_list, label='real')
     plt.plot(fake_list, label='fake')
     plt.legend()
@@ -428,7 +428,7 @@ if __name__ == '__main__':
             DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
             print("DISCRIMINATOR_CHECKPOINT: ", DISCRIMINATOR_CHECKPOINT)
-            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
+            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
         evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
 
@@ -453,10 +453,10 @@ if __name__ == '__main__':
         M = 1
         K = 5
         for n in range(N):
-            print('Iteration {}'.format(n))
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
+                Print('Iteration {}'.format(n))
                 perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
