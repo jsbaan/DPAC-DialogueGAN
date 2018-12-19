@@ -75,7 +75,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
 
     if TF==1:
-        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1)
+        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
 
     # Compute word-level rewards
     elif SEQGAN:
@@ -354,7 +354,11 @@ if __name__ == '__main__':
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
         # Initialize discriminator
-        dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        if SEQGAN:
+            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
+                DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        else:
+            dis = discriminator.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
@@ -375,6 +379,7 @@ if __name__ == '__main__':
             discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
             DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
+            print("DISCRIMINATOR_CHECKPOINT: ", DISCRIMINATOR_CHECKPOINT)
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
         evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
@@ -397,13 +402,15 @@ if __name__ == '__main__':
         dis_data_loader = iter(load_data())
         num_batches = len(gen_data_loader)
         N = ADV_TRAIN_EPOCHS * num_batches
+        print(N)
         M = 1
         K = 5
         for n in range(N):
             print('Iteration {}'.format(n))
-            if n//num_batches % 3 == 0 and n > 0:
+            if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
-            perform_evaluation(evaluator, actor)
+            if n % num_batches == 0:
+                perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
