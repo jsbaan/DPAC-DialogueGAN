@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -230,8 +230,8 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
         fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
         # Get probabilities/rewards for real/fake
-        real_r = dis.batchClassify(real_reply)
-        fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+        real_r = dis.batchClassify(real_reply, context)
+        fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
         # Learn with fake_r
         dis_opt.zero_grad()
@@ -300,8 +300,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
             if SEQGAN:
                 # Get probabilities/rewards for real/fake
-                real_r = dis.batchClassify(real_reply)
-                fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+                real_r = dis.batchClassify(real_reply, context)
+                fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
                 # Learn with fake_r
                 dis_opt.zero_grad()
@@ -455,9 +455,9 @@ if __name__ == '__main__':
         for n in range(N):
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
-            # if n % num_batches == 0:
-            #     print('Iteration {}'.format(n))
-            #     perform_evaluation(evaluator, actor)
+            if n % num_batches == 0:
+                print('Iteration {}'.format(n))
+                perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):

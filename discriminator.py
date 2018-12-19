@@ -30,7 +30,7 @@ class Discriminator(nn.Module):
         h = autograd.Variable(torch.zeros(2*2*1, batch_size, self.hidden_dim)).to(self.device)
         return h
 
-    def forward(self, reply, context, hidden):
+    def forward(self, reply, context, hidden, hidden2):
         # REPLy dim                                                # batch_size x seq_len
         emb = self.embeddings(reply)                               # batch_size x seq_len x embedding_dim
         emb = emb.permute(1, 0, 2)                                 # seq_len x batch_size x embedding_dim
@@ -43,13 +43,12 @@ class Discriminator(nn.Module):
         # Context
         emb = self.embeddings2(context)                               # batch_size x seq_len x embedding_dim
         emb = emb.permute(1, 0, 2)                                 # seq_len x batch_size x embedding_dim
-        _, hidden = self.gru2(emb, hidden)                          # 4 x batch_size x hidden_dim
+        _, hidden = self.gru2(emb, hidden2)                          # 4 x batch_size x hidden_dim
         hidden = hidden.permute(1, 0, 2).contiguous()              # batch_size x 4 x hidden_dim
         out = self.gru2hidden2(hidden.view(-1, 4*self.hidden_dim))  # batch_size x 4*hidden_dim
         out = torch.tanh(out)
         out_context = self.dropout_linear2(out)
-
-        out = self.hidden2out(torch.cat(out_reply, out_context, 1))  # batch_size x 1
+        out = self.hidden2out(torch.cat((out_reply, out_context), 1))  # batch_size x 1
         out = torch.sigmoid(out)
         return out
 
@@ -62,8 +61,9 @@ class Discriminator(nn.Module):
             - out: batch_size ([0,1] score)
         """
 
-        h = self.init_hidden(inp.size()[0])
-        out = self.forward(reply.long(), context.long(), h)
+        h = self.init_hidden(reply.size()[0])
+        h2 = self.init_hidden(context.size()[0])
+        out = self.forward(reply.long(), context.long(), h, h2)
         return out.view(-1)
 
     def batchBCELoss(self, inp, target):
