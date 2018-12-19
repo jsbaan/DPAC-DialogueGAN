@@ -30,6 +30,7 @@ else:
     DEVICE = torch.device('cpu')  #'cuda:0'
     print("RUNNING ON CPU")
 
+
 VOCAB_SIZE = 8000
 MIN_SEQ_LEN = 5
 MAX_SEQ_LEN = 20
@@ -45,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -277,6 +278,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
     loss_per_epoch = []
     losses = []
+    real_list = []
+    fake_list = []
     print("Number of epochs", epochs)
     for epoch in range(start_epoch, epochs):
         print('epoch %d : ' % (epoch + 1))
@@ -316,8 +319,16 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 fake_rewards = calc_mean(fake_r)
                 loss = -(real_rewards - fake_rewards)
                 loss.backward()
-                losses.append(loss_total.item())
+                losses.append(loss.item())
+                real_list.append(real_rewards)
+                fake_list.append(fake_rewards)
             dis_opt.step()
+
+            
+    plt.plot(real_list, label='real')
+    plt.plot(fake_list, label='fake')
+    plt.legend()
+    plt.show()
 
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
     print(real_r, "Real")
