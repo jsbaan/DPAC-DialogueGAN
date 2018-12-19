@@ -12,6 +12,10 @@ logdir="$TMPDIR"/$(date +"%Y-%m-%d_%H:%M:%S")/
 mkdir $logdir
 touch $logdir/log
 
+pip install --user word2vec
+pip install --user matplotlib
+python -c "exec(\"import nltk\nnltk.download('punkt')\")"
+
 cd source
 python main.py | tee "$logdir"/log
 
