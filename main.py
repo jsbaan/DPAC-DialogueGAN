@@ -75,7 +75,10 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
 
     if TF==1:
-        rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
+        if SEQGAN:
+            rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
+        else:
+            rewards = (0.99 * torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)).log()
 
     # Compute word-level rewards
     elif SEQGAN:
@@ -214,29 +217,48 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
     Training the discriminator on real_data_samples (positive) and generated samples from generator (negative).
     Samples are drawn d_steps times, and the discriminator is trained for epochs epochs.
     """
-    fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
-    real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
-    loss = nn.BCELoss()
+    if SEQGAN:
+        fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
+        real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
+        loss = nn.BCELoss()
 
-    dis_opt.zero_grad()
+        dis_opt.zero_grad()
 
-    with torch.no_grad():
-        fake_reply, _ , _= gen.sample(context, real_reply)
-    fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
+        with torch.no_grad():
+            fake_reply, _ , _= gen.sample(context, real_reply)
+        fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
-    # Get probabilities/rewards for real/fake
-    real_r = dis.batchClassify(real_reply)
-    fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+        # Get probabilities/rewards for real/fake
+        real_r = dis.batchClassify(real_reply)
+        fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
-    # Learn with fake_r
-    dis_opt.zero_grad()
-    loss_fake = loss(fake_r, fake_labels)
+        # Learn with fake_r
+        dis_opt.zero_grad()
+        loss_fake = loss(fake_r, fake_labels)
 
-    loss_real = loss(real_r, real_labels)
-    loss_total = loss_real + loss_fake
-    loss_total.backward()
+        loss_real = loss(real_r, real_labels)
+        loss_total = loss_real + loss_fake
+        loss_total.backward()
 
-    dis_opt.step()
+        dis_opt.step()
+    else:
+        dis_opt.zero_grad()
+
+        with torch.no_grad():
+            fake_reply, _= gen.sample(context, real_reply)
+        fake_reply = fill_with_padding(fake_reply, EOU, PAD)
+
+        real_r = dis.get_rewards(real_reply, PAD)
+        fake_r = dis.get_rewards(fake_reply, PAD)
+
+        real_rewards = calc_mean(real_r)
+        fake_rewards = calc_mean(fake_r)
+
+        loss = -(real_rewards - fake_rewards)
+
+        loss.backward()
+        dis_opt.step()
+
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
@@ -271,19 +293,30 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             # Add padding
             fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
-            # Get probabilities/rewards for real/fake
-            real_r = dis.batchClassify(real_reply)
-            fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+            if SEQGAN:
+                # Get probabilities/rewards for real/fake
+                real_r = dis.batchClassify(real_reply)
+                fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
-            # Learn with fake_r
-            dis_opt.zero_grad()
-            loss_fake = loss(fake_r, fake_labels)
+                # Learn with fake_r
+                dis_opt.zero_grad()
+                loss_fake = loss(fake_r, fake_labels)
 
-            loss_real = loss(real_r, real_labels)
-            loss_total = loss_real + loss_fake
-            loss_total.backward()
+                loss_real = loss(real_r, real_labels)
+                loss_total = loss_real + loss_fake
+                loss_total.backward()
+                losses.append(loss_total.item())
+            else:
+                real_r = dis.get_rewards(real_reply, PAD)
+                fake_r = dis.get_rewards(fake_reply, PAD)
+
+                real_rewards = calc_mean(real_r)
+                fake_rewards = calc_mean(fake_r)
+                loss = -(real_rewards - fake_rewards)
+                loss.backward()
+                losses.append(loss_total.item())
             dis_opt.step()
-            losses.append(loss_total.item())
+
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
     print(real_r, "Real")
     print(fake_r, "Fake")
