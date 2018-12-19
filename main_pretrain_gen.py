@@ -350,7 +350,7 @@ if __name__ == '__main__':
         print('Starting Generator MLE Training...')
         gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
         genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
-        gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+        gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS, DEVICE)
 
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
