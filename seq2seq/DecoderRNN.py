@@ -150,8 +150,9 @@ class DecoderRNN(BaseRNN):
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
                 function=function)
+            indices = torch.arange(inputs.size(0))
             for t in range(1, probabilities.size(1)):
-                probabilities[np.arange(inputs.size(0)), t] = decoder_output[np.arange(inputs.size(0)), t-1, inputs[np.arange(inputs.size(0)), t].view(-1)].exp().view(-1)
+                probabilities[indices, t] = decoder_output[indices, t-1, inputs[indices, t].view(-1)].exp().view(-1)
             for di in range(decoder_output.size(1)):
                 step_output = decoder_output[:, di, :]
                 if attn is not None:
