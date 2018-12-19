@@ -152,7 +152,8 @@ class DecoderRNN(BaseRNN):
                 function=function)
             indices = torch.arange(inputs.size(0))
             if torch.cuda.is_available():
-                indices.cuda()
+                indices = indices.cuda()
+                probabilities = probabilities.cuda()
             for t in range(1, probabilities.size(1)):
                 probabilities[indices, t] = decoder_output[indices, t-1, inputs[indices, t].view(-1)].exp().view(-1)
             for di in range(decoder_output.size(1)):
