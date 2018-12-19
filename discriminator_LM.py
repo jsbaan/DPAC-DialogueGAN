@@ -95,5 +95,5 @@ class Discriminator(nn.Module):
         """
         output = self.batchClassify(history.long())
         reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
-        reward = torch.log(reward.squeeze() + 1e-12) # prevent taking the log of zero
+        reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
         return reward
