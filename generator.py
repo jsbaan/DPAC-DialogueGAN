@@ -47,10 +47,10 @@ class Generator(nn.Module):
         sentences, probabilities, hiddens = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=TF, sample=True)
         return sentences, probabilities, hiddens
 
-    def forward(self, src, tgt):
+    def forward(self, src, tgt, hack=False):
         src = src.t()
         tgt = tgt.t()
-        outputs, _, _ = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
+        outputs, _, meta_data = self.seq2seq(src, target_variable=tgt, teacher_forcing_ratio=self.teacher_forcing_ratio)
 
         batch_size = outputs[0].size(0)
         start_tokens = torch.zeros(batch_size, self.vocab_size, device=outputs[0].device)
@@ -58,6 +58,8 @@ class Generator(nn.Module):
 
         outputs = [start_tokens] + outputs
         outputs = torch.stack(outputs)
+        if hack == True:
+            return outputs, meta_data
         return outputs
 
         # NOTICE THAT DISCOUNT FACTOR is 1
@@ -216,7 +218,7 @@ class Generator(nn.Module):
                     # samples_prob[:, next_t] = prob
                     samples[:, next_t] = batch_token_sample
                     output = batch_token_sample
-                reward = dis.batchClassify(samples.long().to(DEVICE)) ## FIX CONTENT
+                reward = dis.batchClassify(samples.long().to(DEVICE), context.long().to(DEVICE)) ## FIX CONTENT
                 rewards[t, n, :] = reward
         reward_per_word = torch.mean(rewards, dim=1).permute(1, 0)
         return reward_per_word

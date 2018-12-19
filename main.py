@@ -54,7 +54,7 @@ ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
 AC = False
-SEQGAN = False
+SEQGAN = True
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
@@ -230,8 +230,8 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
         fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
         # Get probabilities/rewards for real/fake
-        real_r = dis.batchClassify(real_reply)
-        fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+        real_r = dis.batchClassify(real_reply, context)
+        fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
         # Learn with fake_r
         dis_opt.zero_grad()
@@ -306,8 +306,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
                 
                 # Get probabilities/rewards for real/fake
-                real_r = dis.batchClassify(real_reply)
-                fake_r = dis.batchClassify(fake_reply.to(DEVICE))
+                real_r = dis.batchClassify(real_reply, context)
+                fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
                 # Learn with fake_r
                 
@@ -438,8 +438,10 @@ if __name__ == '__main__':
             discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
             DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
-            print("DISCRIMINATOR_CHECKPOINT: ", DISCRIMINATOR_CHECKPOINT)
-            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
+            if SEQGAN:
+                discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
+            else:
+                discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
         evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
 
@@ -467,7 +469,7 @@ if __name__ == '__main__':
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
-                Print('Iteration {}'.format(n))
+                print('Iteration {}'.format(n))
                 perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
