@@ -330,6 +330,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             plt.legend()
             plt.savefig('rewards.png')
 
+            sys.exit()
+
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
     print(real_r, "Real")
     print(fake_r, "Fake")
