@@ -2,10 +2,15 @@ from dataloader.dp_corpus import DPCorpus
 from dataloader.dp_data_loader import DPDataLoader
 import pickle
 import os
-# from nlgeval import NLGEval
+
+# try:
+#     from nlgeval import NLGEval
+# except:
+#     pass
+
 from evaluation.embedding_metrics import *
 import torch
-from torchnlp.metrics import *
+# from torchnlp.metrics import *
 
 import word2vec
 
