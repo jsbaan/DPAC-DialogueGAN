@@ -37,7 +37,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 20
+DIS_TRAIN_EPOCHS = 5
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -328,10 +328,10 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 losses.append(LM_loss.item())
 
                 if iter % 20 == 0:
-                    print("real ", real_rewards)
-                    print("fake ", fake_rewards)
-                    real_list.append(real_rewards)
-                    fake_list.append(fake_rewards)
+                    print("real ", real_rewards.item())
+                    print("fake ", fake_rewards.item())
+                    real_list.append(real_rewards.item())
+                    fake_list.append(fake_rewards.item())
 
             dis_opt.step()
 
