@@ -324,7 +324,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 fake_list.append(fake_rewards)
             dis_opt.step()
 
-            
+
     plt.plot(real_list, label='real')
     plt.plot(fake_list, label='fake')
     plt.legend()
@@ -428,7 +428,7 @@ if __name__ == '__main__':
             DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
             print("DISCRIMINATOR_CHECKPOINT: ", DISCRIMINATOR_CHECKPOINT)
-            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
+            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
         evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
 
