@@ -9,13 +9,16 @@ import torch
 import word2vec
 
 class Evaluator:
-    def __init__(self, data_loader_path='../dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128, device="cpu"):
+    def __init__(self, data_loader_path=None, log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128, device="cpu"):
         self.log = log
         self.vocab_size = vocab_size
         self.min_seq_len = min_seq_len
         self.max_seq_len = max_seq_len
         self.batch_size = batch_size
 
+        if data_loader_path == None:
+            parent_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+            data_loader_path = parent_dir + '/dataloader/daily_dialog/'
         self.load_data_loader(data_loader_path + 'validation_loader' + '_' + str(batch_size) + '.pickle')
 
         self.corpus = self.data_loader.dataset.corpus
