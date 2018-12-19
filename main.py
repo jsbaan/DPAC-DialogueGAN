@@ -398,14 +398,15 @@ if __name__ == '__main__':
 
         # Evaluation
         for epoch in range(ADV_TRAIN_EPOCHS):
-            if epoch % 3 == 0 and epoch > 0:
+            if epoch % 1 == 0 and epoch > 0:
                 save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer)
+            print("Evaluating: ")
+            perform_evaluation(evaluator, actor)
 
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
             sys.stdout.flush()
-            perform_evaluation(evaluator, actor)
 
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
