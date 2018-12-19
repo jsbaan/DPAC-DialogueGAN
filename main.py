@@ -54,7 +54,7 @@ ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
 AC = False
-SEQGAN = True
+SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
@@ -323,9 +323,9 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
                 real_rewards = calc_mean(real_r)
                 fake_rewards = calc_mean(fake_r)
-                loss = -(real_rewards - fake_rewards)
-                loss.backward()
-                losses.append(loss.item())
+                LM_loss = -(real_rewards - fake_rewards)
+                LM_loss.backward()
+                losses.append(LM_loss.item())
 
                 if iter % 20 == 0:
                     print("real ", real_rewards)
