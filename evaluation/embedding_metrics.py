@@ -46,8 +46,8 @@ def greedy_score(fileone, filetwo, w2v):
     f2 = open(filetwo, 'r')
     r1 = f1.readlines()
     r2 = f2.readlines()
-    # dim = w2v.layer1_size # embedding dimensions
-    dim = next(iter(w2v.values())).size(0)
+    dim = w2v.layer1_size # embedding dimensions
+    # dim = next(iter(w2v.values())).size(0)
 
     scores = []
 
@@ -60,12 +60,12 @@ def greedy_score(fileone, filetwo, w2v):
         o = 0.0
         Y = np.zeros((dim,1))
         for tok in tokens2:
-            if tok in w2v:
+            # if tok in w2v:
                 Y = np.hstack((Y,(w2v[tok].detach().cpu().numpy().reshape((dim,1)))))
                 y_count += 1
 
         for tok in tokens1:
-            if tok in w2v:
+            # if tok in w2v:
                 tmp  = w2v[tok].detach().cpu().numpy().reshape((1,dim)).dot(Y)
                 o += np.max(tmp)
                 x_count += 1
@@ -95,11 +95,11 @@ def extrema_score(fileone, filetwo, w2v):
         tokens2 = r2[i].strip().split(" ")
         X= []
         for tok in tokens1:
-            if tok in w2v:
+            # if tok in w2v:
                 X.append(w2v[tok].detach().cpu().numpy())
         Y = []
         for tok in tokens2:
-            if tok in w2v:
+            # if tok in w2v:
                 Y.append(w2v[tok].detach().cpu().numpy())
 
         # if none of the words have embeddings in ground truth, skip
@@ -144,8 +144,8 @@ def average(fileone, filetwo, w2v):
     f2 = open(filetwo, 'r')
     r1 = f1.readlines()
     r2 = f2.readlines()
-    # dim = w2v.layer1_size # embedding dimensions
-    dim = next(iter(w2v.values())).size(0)
+    dim = w2v.layer1_size # embedding dimensions
+    # dim = next(iter(w2v.values())).size(0)
 
     scores = []
 
@@ -154,11 +154,11 @@ def average(fileone, filetwo, w2v):
         tokens2 = r2[i].strip().split(" ")
         X= np.zeros((dim,))
         for tok in tokens1:
-            if tok in w2v:
+            # if tok in w2v:
                 X+=w2v[tok].detach().cpu().numpy()
         Y = np.zeros((dim,))
         for tok in tokens2:
-            if tok in w2v:
+            # if tok in w2v:
                 Y += w2v[tok].detach().cpu().numpy()
 
         # if none of the words in ground truth have embeddings, skip
