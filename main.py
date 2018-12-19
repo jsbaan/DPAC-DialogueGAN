@@ -39,46 +39,67 @@ DIS_TRAIN_EPOCHS = 2
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
-DIS_EMBEDDING_DIM = 64
-DIS_HIDDEN_DIM = 64
+DIS_EMBEDDING_DIM = 128
+DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
-DISCRIMINATOR_CHECKPOINT = None
-GEN_MLE_LR = 1e-2
-DISCRIMINATOR_MLE_LR = 1e-2
-ACTOR_LR = 1e-2
-CRITIC_LR = 1e-2
-DISCRIMINATOR_LR = 1e-2
+DISCRIMINATOR_CHECKPOINT = None#"discriminator_checkpoint3.pth.tar"
+DISCRIMINATOR_MLE_LR = 1e-3
+ACTOR_LR = 1e-3
+CRITIC_LR = 1e-3
+DISCRIMINATOR_LR = 1e-3
 AC = False
+SEQGAN = True
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
 NUM_SAMPLES = 3
 # Number of gen
 
-def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples, TF=0):
+def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     """
     The generator is trained using policy gradients, using the reward from the discriminator.
     Training is done for one batch.
     """
-    # Forward passdis, context, seq, hiddens, num_samples # I am a nice person
-    fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
-    if TF == 1:
-        fake_reply = reply
 
+    # Forward pass
+    fake_reply, word_probabilities = gen.sample(context, reply, TF=TF)
+
+    if TF==1:
+        fake_reply = reply
     # Compute word-level rewards
-    rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
+    if SEQGAN:
+        rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
+    else:
+        # Compute word-level rewards
+        rewards = dis.get_rewards(fake_reply, PAD)
+
+
+
+
+    # Compute perplexity
+    entropy = torch.mean(word_probabilities.log(), dim=1)
+    perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute REINFORCE loss with the assumption that G = R_t
     pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
+
     # Backward pass
     gen_opt.zero_grad()
     pg_loss.backward()
     gen_opt.step()
+
+    # Print the generator and real reply for testing purposes
+    # print("Generated reply")
+    # print(corpus.ids_to_tokens([int(i) for i in fake_reply[0]]))
+    # print("Real  reply")
+    # print(corpus.ids_to_tokens([int(i) for i in reply[0]]))
+
+    return perplexity
 
 def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer, EOU,PAD):
     """
@@ -204,7 +225,7 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
     real_r = dis.batchClassify(real_reply)
     fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
-    # Learn with fake_r 
+    # Learn with fake_r
     dis_opt.zero_grad()
     loss_fake = loss(fake_r, fake_labels)
 
@@ -251,7 +272,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             real_r = dis.batchClassify(real_reply)
             fake_r = dis.batchClassify(fake_reply.to(DEVICE))
 
-            # Learn with fake_r 
+            # Learn with fake_r
             dis_opt.zero_grad()
             loss_fake = loss(fake_r, fake_labels)
 
@@ -289,12 +310,11 @@ def load_data(path='dataset.pickle'):
         corpus = train_data_loader.dataset.corpus
     return corpus,train_data_loader, train_MLE_data_loader
 
-def save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer):
+def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
     torch.save({
                         'epoch': epoch+1,
                         'actor': actor.state_dict(),
                         'act_optimizer' : PG_optimizer.state_dict(),
-                        'act_MLE_optimizer' : actorMLE_optimizer.state_dict(),
                         'dis_optimizer' : dis_optimizer.state_dict(),
                         'discriminator': discriminator.state_dict()
                     },'adversial_checkpoint{}.pth.tar'.format(epoch))
@@ -345,9 +365,12 @@ if __name__ == '__main__':
         actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
             MAX_SEQ_LEN).to(DEVICE)
         actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
-        actorMLE_optimizer = optim.Adagrad(actor.parameters(),lr=GEN_MLE_LR)
-        discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM, \
-        DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        if SEQGAN:
+            discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
+                DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+        else:
+            discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
+            DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
@@ -364,32 +387,35 @@ if __name__ == '__main__':
         # Use optimizer for baseline DP-GAN
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
+
         # Evaluation
         for epoch in range(ADV_TRAIN_EPOCHS):
             if epoch % 3 == 0 and epoch > 0:
-                save_models(actor, discriminator, epoch, PG_optimizer, actorMLE_optimizer, dis_optimizer)
+                save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer)
 
             dataiter = iter(MLE_data_loader)
             print('\n--------\nEPOCH %d\n--------' % (epoch+1))
 
             sys.stdout.flush()
-            perform_evaluation(evaluator, actor)
+            # perform_evaluation(evaluator, actor)
 
             for (batch, (context, reply)) in enumerate(train_data_loader):
                 context = context.to(DEVICE)
                 reply = reply.to(DEVICE)
                 # TRAIN GENERATOR (ACTOR)
-                # Policy gradient step
+                # AC step
                 if AC:
                     perplexity = train_generator_PGAC(context, reply,\
                         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
-                # Or actor critic step
+                # PG step
                 else:
                     perplexity = train_generator_PG(context, reply,\
-                    actor, PG_optimizer,discriminator, NUM_SAMPLES)
+                        actor, PG_optimizer,discriminator,num_samples=NUM_SAMPLES)
 
-                    context_MLE, reply_MLE = dataiter.next()
-                    train_generator_PG(context_MLE.to(DEVICE), reply_MLE.to(DEVICE), actor, PG_optimizer, discriminator, NUM_SAMPLES, TF=1)
+                    # Teacher forcing
+                    real_context, real_reply = dataiter.next()
+                    perplexity = train_generator_PG(real_context.to(DEVICE), real_reply.to(DEVICE), \
+                        actor, PG_optimizer, discriminator, num_samples=NUM_SAMPLES,TF=1)
 
                 # TRAIN DISCRIMINATOR
                 train_discriminator(context,reply, actor, discriminator, dis_optimizer)

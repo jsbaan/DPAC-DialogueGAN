@@ -6,8 +6,10 @@ import os
 from evaluation.embedding_metrics import *
 import torch
 
+import word2vec
+
 class Evaluator:
-    def __init__(self, data_loader_path='dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128, device="cpu"):
+    def __init__(self, data_loader_path='../dataloader/daily_dialog/', log=True, vocab_size = 8000, min_seq_len=5, max_seq_len=20, batch_size=128, device="cpu"):
         self.log = log
         self.vocab_size = vocab_size
         self.min_seq_len = min_seq_len
@@ -18,7 +20,9 @@ class Evaluator:
 
         self.corpus = self.data_loader.dataset.corpus
         self.sos_id = self.corpus.token_to_id(self.corpus.SOS)
+        self.eos_id = self.corpus.token_to_id(self.corpus.EOS)
         self.eou_id = self.corpus.token_to_id(self.corpus.EOU)
+        self.tokens_to_remove = [self.sos_id, self.eos_id, self.eou_id]
         self.device = device
 
     def load_data_loader(self, path):
@@ -74,32 +78,65 @@ class Evaluator:
 
             for i in range(context.size(1)):
                 context_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in context[:, i]]))
-                real_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in reply[:, i]]))
+                real_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in reply[:, i]]))# if i not in self.tokens_to_remove]))
 
                 output_i = [int(i) for i in output.argmax(2)[:, i].tolist()]
                 try:
-                    eou_i = output.index(self.eou_id)
-                    output_i = output[:eou_i + 1]
+                    eou_i = output_i.index(self.eou_id)
+                    output_i = output_i[:eou_i + 1]
                 except:
                     pass
-                generated_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in output_i]))
+
+                generated_i = ' '.join(self.corpus.ids_to_tokens([int(i) for i in output_i]))# if i not in self.tokens_to_remove]))
+
+                # if i == 0:
+                #     print(context_i)
+                #     print(real_i)
+                #     print(generated_i)
+                #     print()
 
                 real_replies.append(real_i)
                 generated_replies.append(generated_i)
+                # break
 
+            # break
         return real_replies, generated_replies
 
     def get_word2vec(self, embedding_model, replies):
-        word2vec = {}
-        embedding_model = embedding_model.to(self.device)
-        for reply in replies:
-            tokens = reply.split()
+        path = os.path.dirname(os.path.realpath(__file__))
+        w2v = word2vec.load(path + 'word2vec.bin')
 
-            for token in tokens:
-                if token not in word2vec:
-                    id = self.corpus.token_to_id(token)
-                    id_tensor = torch.tensor(id, dtype=torch.long, requires_grad=False)
-                    embedding = embedding_model(id_tensor.to(self.device))
-                    word2vec[token] = embedding
+        #torchwordemb.load_word2vec_bin('GoogleNews-vectors-negative300.bin')
+        # word2vec = {}
+        # embedding_model = embedding_model.to(self.device)
+        # for reply in replies:
+        #     tokens = reply.split()
+        #
+        #     for token in tokens:
+        #         if token not in word2vec:
+        #             # id = self.corpus.token_to_id(token)
+        #             # id_tensor = torch.tensor(id, dtype=torch.long, requires_grad=False)
+        #             # embedding = embedding_model(id_tensor.to(self.device))
+        #             # word2vec[token] = embedding
+        #             word2vec[token] = vec[vocab[token]]
+        #
+        # word2vec['<unk>'] = torch.zeros(300)
 
-        return word2vec
+        return WordVectorsWrapper(w2v)
+
+class WordVectorsWrapper:
+    def __init__(self, word_vectors):
+        self.word_vectors = word_vectors
+        self.layer1_size = 100
+
+    def __getitem__(self, item):
+        try:
+            result = torch.from_numpy(self.word_vectors[item])
+            return result
+        except:
+            return torch.rand(100)
+
+        # if item in self.word_vectors:
+        #     return torch.from_numpy(self.word_vectors[item])
+        # else:
+        #     return torch.rand(256)
