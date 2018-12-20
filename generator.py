@@ -66,7 +66,8 @@ class Generator(nn.Module):
     def compute_reinforce_loss(self, rewards, probabilities):
         rewards = rewards.to(DEVICE)
         probabilities = probabilities.to(DEVICE)
-        R_s_w = rewards
+        sentences_level_reward = torch.mean(rewards, 1)
+        R_s_w = torch.mul(sentences_level_reward.view(-1, 1), rewards)
 
         sent_len = rewards.size(1)
         J = 0

@@ -58,7 +58,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM2.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = None#"discriminator_final_LM2.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -74,6 +74,8 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
 
     # Forward pass
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
+    fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
+
 
     if TF==1:
         if SEQGAN:
