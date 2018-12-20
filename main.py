@@ -37,7 +37,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 5
+DIS_TRAIN_EPOCHS = 3
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -283,6 +283,7 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     losses = []
     real_list = []
     fake_list = []
+    count = 0
     print("Number of epochs", epochs)
     for epoch in range(start_epoch, epochs):
         print('epoch %d : ' % (epoch + 1))
@@ -327,12 +328,22 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 loss_fake = torch.mean(sentence_level_rewards_fake)
                 loss_real = -torch.mean(sentence_level_rewards_real)
                 total_loss = loss_fake + loss_real
-                total_loss.backward()
+                total_loss.backward()                
             dis_opt.step()
 
 
-    plt.plot(real_list, label='real')
-    plt.plot(fake_list, label='fake')
+    # smooth results
+    real = []
+    fake = []
+    interval = 10
+    for i in range(len(real_list)):
+        if i % interval == 0:
+            real.append(np.mean(real_list[i:i+interval]))
+            fake.append(np.mean(fake_list[i:i+interval]))
+    plt.plot(real, label='real')
+    plt.plot(fake, label='fake')
+    plt.ylabel('Reward')
+    plt.xlabel('Iterations x 10')
     plt.legend()
     plt.savefig('rewards.png')
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
