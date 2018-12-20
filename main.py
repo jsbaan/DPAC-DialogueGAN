@@ -421,7 +421,7 @@ if __name__ == '__main__':
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
             # dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
-            dis = discriminator_LM2.LM(DIS_EMBEDDING_DIM, MAX_SEQ_LEN, BATCH_SIZE, VOCAB_SIZE, 2)
+            dis = discriminator_LM2.LM(DIS_EMBEDDING_DIM, MAX_SEQ_LEN, BATCH_SIZE, VOCAB_SIZE, 2).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
