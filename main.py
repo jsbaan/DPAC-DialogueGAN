@@ -54,11 +54,11 @@ ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
 AC = False
-SEQGAN = True
+SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_checkpoint3.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
