@@ -46,9 +46,9 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
-ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
+ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
@@ -426,7 +426,7 @@ if __name__ == '__main__':
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
             # dis = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
-            dis = discriminator_LM2.LM(DIS_EMBEDDING_DIM, MAX_SEQ_LEN, BATCH_SIZE, VOCAB_SIZE, 2).to(DEVICE)
+            dis = discriminator_LM2.LM(DIS_EMBEDDING_DIM, VOCAB_SIZE, device=DEVICE).to(DEVICE)
         dis_optimizer = optim.Adam(dis.parameters(),lr = DISCRIMINATOR_MLE_LR)
 
         # Load pretrained generator
@@ -444,7 +444,7 @@ if __name__ == '__main__':
             discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
-            discriminator = discriminator_LM2.LM(DIS_EMBEDDING_DIM, MAX_SEQ_LEN, BATCH_SIZE, VOCAB_SIZE, 2).to(DEVICE)
+            discriminator = discriminator_LM2.LM(DIS_EMBEDDING_DIM, VOCAB_SIZE, device=DEVICE).to(DEVICE)
 
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
