@@ -477,7 +477,7 @@ if __name__ == '__main__':
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
                 print('Iteration {}'.format(n))
-                # perform_evaluation(evaluator, actor)
+                perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
@@ -501,7 +501,6 @@ if __name__ == '__main__':
                         gen_data_loader_tf = iter(load_data())
                     perplexity = train_generator_PG(context.to(DEVICE), reply.to(DEVICE), \
                         actor, PG_optimizer, discriminator, num_samples=NUM_SAMPLES,TF=1)
-                    print("HIERO")
             # TRAIN DISCRIMINATOR
             for k in range(K):
                 try:
