@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -58,9 +58,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
-
-
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM2.pth.tar"
 
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
@@ -88,14 +86,14 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
     else:
         # Compute word-level rewards
-        rewards = dis.get_rewards(fake_reply, PAD).detach()
+        rewards, sentence_level_rewards = dis.get_rewards(fake_reply, PAD).detach()
 
     # Compute perplexity
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute REINFORCE loss with the assumption that G = R_t
-    pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities)
+    pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities, sent_rewards=sentence_level_rewards)
 
     # Backward pass
     gen_opt.zero_grad()
@@ -252,13 +250,12 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
             fake_reply, _,_= gen.sample(context, real_reply)
         fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
-        real_r = dis.get_rewards(real_reply.to(DEVICE), PAD)
-        fake_r = dis.get_rewards(fake_reply.to(DEVICE).detach(), PAD)
-
-        real_rewards = calc_mean(real_r)
-        fake_rewards = calc_mean(fake_r)
-
-        loss = -(real_rewards - fake_rewards)
+        _, sentence_level_rewards_real = dis.get_rewards(real_reply.to(DEVICE), PAD)
+        _, sentence_level_rewards_fake = dis.get_rewards(fake_reply.to(DEVICE).detach(), PAD)
+        loss_fake = torch.mean(sentence_level_rewards_fake)
+        loss_real = -torch.mean(sentence_level_rewards_real)
+        total_loss = loss_fake + loss_real
+        total_loss.backward() 
         loss.backward()
 
         dis_opt.step()
@@ -439,8 +436,8 @@ if __name__ == '__main__':
             discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         else:
-            discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
-            DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
+            discriminator = discriminator_LM2.LM(DIS_EMBEDDING_DIM, MAX_SEQ_LEN, BATCH_SIZE, VOCAB_SIZE, 2).to(DEVICE)
+
         if DISCRIMINATOR_CHECKPOINT:
             discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
 

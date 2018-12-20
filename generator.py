@@ -63,10 +63,13 @@ class Generator(nn.Module):
         return outputs
 
         # NOTICE THAT DISCOUNT FACTOR is 1
-    def compute_reinforce_loss(self, rewards, probabilities):
+    def compute_reinforce_loss(self, rewards, probabilities, sent_rewards=None):
         rewards = rewards.to(DEVICE)
         probabilities = probabilities.to(DEVICE)
-        sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
+        if sent_rewards == None:
+            sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
+        else:
+            sentence_level_reward = sent_rewards
         R_s_w = torch.mul(rewards, sentence_level_reward)
 
         sent_len = rewards.size(1)
