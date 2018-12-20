@@ -39,7 +39,8 @@ class LM(nn.Module):
     return logits.view(self.batch_size, self.num_steps, self.vocab_size), hidden
 
   def get_rewards(self, reply, PAD):
-    probabilities, _ = self.forward(reply.long())
+    reply = reply.long()
+    probabilities, _ = self.forward(reply)
     rewards = torch.zeros(self.batch_size, self.num_steps - 1)
     indices = torch.arange(self.batch_size).long()
     if torch.cuda.is_available():
