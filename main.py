@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -332,21 +332,29 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     # smooth results
     real = []
     fake = []
-    interval = 10
+    interval = 20
     for i in range(len(real_list)):
         if i % interval == 0:
-            real.append(np.mean(real_list[i:i+interval]))
-            fake.append(np.mean(fake_list[i:i+interval]))
+            real_mean = np.mean(real_list[i:i+interval])
+            fake_mean = np.mean(fake_list[i:i+interval])
+            print("real mean ", real_mean)
+            print("fake mean ", fake_mean)
+            real.append(real_mean)
+            fake.append(fake_mean)
+
+    plt.figure(1)
     plt.plot(real, label='real')
     plt.plot(fake, label='fake')
     plt.ylabel('Reward')
-    plt.xlabel('Iterations x 10')
+    plt.xlabel('Iterations x'+ str(interval))
     plt.legend()
     plt.savefig('rewards.png')
+
     torch.save(dis.state_dict(), "discriminator_final.pth.tar")
-    print(real_r, "Real")
-    print(fake_r, "Fake")
+    plt.figure(2)
     plt.plot(losses)
+    plt.ylabel("Loss")
+    plt.xlabel("iterations x "+ str(interval))
     plt.savefig("loss_disc_pretrain.png")
 
 def load_data(path='dataset.pickle'):
