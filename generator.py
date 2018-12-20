@@ -63,7 +63,7 @@ class Generator(nn.Module):
         return outputs
 
         # NOTICE THAT DISCOUNT FACTOR is 1
-    def compute_reinforce_loss(self, rewards, probabilities, sent_rewards=0, sent=False):
+    def compute_reinforce_loss(self, rewards, probabilities):
         rewards = rewards.to(DEVICE)
         probabilities = probabilities.to(DEVICE)
         if sent == False:
