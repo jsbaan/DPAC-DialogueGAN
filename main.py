@@ -48,7 +48,7 @@ CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = True
-ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
+ACTOR_CHECKPOINT = "generator_checkpoint39.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-3
 CRITIC_LR = 1e-2
@@ -383,6 +383,27 @@ def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
                     },'adversial_checkpoint{}.pth.tar'.format(epoch))
     print("Models and Optimizers saved")
 
+def load_models():
+    prefix = 'adversial_checpoint'
+    postfix = '.pth.tar'
+    files = [f for f in os.listdir('.') if os.path.isfile(f)]
+    files = [f for f in files if f.startswith(prefix) and f.endswith(postfix)]
+
+    nums = []
+    for f in files:
+        try:
+            nums.append(int(f[len(prefix):-len(postfix)]))
+        except:
+            pass
+
+    nums = sorted(nums)
+    if len(nums) > 2:
+        file = prefix + str(nums[-2]) + postfix
+        data = torch.load(file)
+
+        return data
+
+    return None
 
 def perform_evaluation(evaluator, actor):
     actor = actor.eval()
@@ -392,6 +413,8 @@ def perform_evaluation(evaluator, actor):
     print("Extrema Score: ", result['extrema_score'][0])
     print("Average (Cosine similarity): ", result['average'][0])
     actor = actor.train()
+
+
 
 if __name__ == '__main__':
     '''
@@ -432,7 +455,8 @@ if __name__ == '__main__':
         # Initialize actor and discriminator using pre-trained state-dict
         actor = Generator(SOS,EOU, VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM,\
             MAX_SEQ_LEN).to(DEVICE)
-        actor.load_state_dict(torch.load(ACTOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
+        actor.load_state_dict(torch.load(ACTOR_CHECKPOINT, map_location=DEVICE)['state_dict'])
+
         if SEQGAN:
             discriminator = discriminator.Discriminator(DIS_EMBEDDING_DIM,\
                 DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
@@ -456,6 +480,15 @@ if __name__ == '__main__':
         # Use optimizer for baseline DP-GAN
         else:
             PG_optimizer = optim.Adagrad(actor.parameters(),ACTOR_LR)
+
+        start_epoch = 0
+        saved_data = load_models()
+        if saved_data is not None:
+            start_epoch = saved_data['epoch']
+            actor.load_state_dict(saved_data['actor'])
+            PG_optimizer.load_state_dict(data['act_optimizer'])
+            dis_optimizer.load_state_dict(data['dis_optimizer'])
+            discriminator.load_state_dict(data['discriminator'])
 
         # Adversarial training loop
         gen_data_loader = iter(load_data())
