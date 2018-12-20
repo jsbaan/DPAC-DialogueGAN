@@ -60,6 +60,8 @@ if SEQGAN:
 else:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
 
+
+
 AC_WARMUP = 1000
 DISCOUNT_FACTOR = 0.99
 BATCH_SIZE_TESTING = 256
@@ -304,13 +306,13 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
 
                 fake_labels = torch.from_numpy(np.random.uniform(0, 0.3, size=(BATCH_SIZE))).float().to(DEVICE)
                 real_labels = torch.from_numpy(np.random.uniform(0.7, 1.2, size=(BATCH_SIZE))).float().to(DEVICE)
-                
+
                 # Get probabilities/rewards for real/fake
                 real_r = dis.batchClassify(real_reply, context)
                 fake_r = dis.batchClassify(fake_reply.to(DEVICE), context)
 
                 # Learn with fake_r
-                
+
                 loss_fake = loss(fake_r, fake_labels)
 
                 loss_real = loss(real_r, real_labels)
@@ -438,10 +440,8 @@ if __name__ == '__main__':
             discriminator = discriminator_LM.Discriminator(DIS_EMBEDDING_DIM, \
             DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
         if DISCRIMINATOR_CHECKPOINT:
-            if SEQGAN:
-                discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
-            else:
-                discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE)['state_dict'])
+            discriminator.load_state_dict(torch.load(DISCRIMINATOR_CHECKPOINT,map_location=DEVICE))
+
         dis_optimizer = optim.Adagrad(discriminator.parameters(),lr=DISCRIMINATOR_LR)
         evaluator = Evaluator(vocab_size=VOCAB_SIZE, min_seq_len=MIN_SEQ_LEN, max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE_TESTING, device=DEVICE)
 
