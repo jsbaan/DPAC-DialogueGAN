@@ -38,7 +38,7 @@ class LM(nn.Module):
       input_t = reply[:, :t+1]
       label = reply[:, t+1]
       prediction = self.forward(input_t)
-      rewards[indices, t] = - prediction[indices, label.view(-1)].log()
+      rewards[indices, t] = prediction[indices, label.view(-1)].log()
     padding_matrix = (reply[:, 1:] != PAD).float()
     padding_matrix_sum = torch.sum(padding_matrix, 1) # count number of non padding numbers for average
     rewards = rewards * padding_matrix
