@@ -79,7 +79,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         if SEQGAN:
             rewards = torch.ones(BATCH_SIZE, MAX_SEQ_LEN-1).to(DEVICE)
         else:
-            rewards = (torch.ones(BATCH_SIZE, MAX_SEQ_LEN-1).to(DEVICE)).log()
+            rewards = torch.ones(BATCH_SIZE, MAX_SEQ_LEN-1).to(DEVICE)
 
     # Compute word-level rewards
     elif SEQGAN:
