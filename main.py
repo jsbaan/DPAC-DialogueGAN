@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-3
@@ -81,7 +81,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         if SEQGAN:
             rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
         else:
-            rewards = (0.99 * torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)).log()
+            rewards = -(0.99 * torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)).log()
 
     # Compute word-level rewards
     elif SEQGAN:
