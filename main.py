@@ -253,7 +253,7 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
         fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
         _, sentence_level_rewards_real = dis.get_rewards(real_reply.to(DEVICE), PAD)
-        _, sentence_level_rewards_fake = dis.get_rewards(fake_reply.to(DEVICE).detach(), PAD)
+        _, sentence_level_rewards_fake = dis.get_rewards(fake_reply.long().to(DEVICE).detach(), PAD)
         loss_fake = torch.mean(sentence_level_rewards_fake)
         loss_real = -torch.mean(sentence_level_rewards_real)
         total_loss = loss_fake + loss_real
