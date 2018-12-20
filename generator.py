@@ -66,10 +66,6 @@ class Generator(nn.Module):
     def compute_reinforce_loss(self, rewards, probabilities):
         rewards = rewards.to(DEVICE)
         probabilities = probabilities.to(DEVICE)
-        if sent == False:
-            sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
-        else:
-            sentence_level_reward = sent_rewards.view(-1)
         R_s_w = rewards
 
         sent_len = rewards.size(1)
