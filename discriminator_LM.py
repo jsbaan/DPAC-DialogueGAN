@@ -49,8 +49,8 @@ class Discriminator(nn.Module):
             - out: batch_size ([0,1] score)
         """
 
-        h_response = self.init_hidden(input.size()[0])
-        output = self.forward(input.long(), h_response)
+        h_response = self.init_hidden(input.size()[0]).to(self.device)
+        output = self.forward(input.long().to(self.device), h_response).
         return output
 
     def batchBCELoss(self, inp, target):
