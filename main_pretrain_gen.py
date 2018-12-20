@@ -415,7 +415,7 @@ if __name__ == '__main__':
         gen.load_state_dict(saved_gen['state_dict'])
 
         genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
-        gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS)
+        gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS, DEVICE)
 
     if PRETRAIN_DISCRIMINATOR:
         print('\nStarting Discriminator MLE Training...')
