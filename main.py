@@ -46,8 +46,8 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = True
-POLICY_GRADIENT = False
+PRETRAIN_DISCRIMINATOR = False
+POLICY_GRADIENT = True
 ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 DISCRIMINATOR_MLE_LR = 5e-2
 ACTOR_LR = 1e-2
@@ -77,9 +77,9 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
 
     if TF==1:
         if SEQGAN:
-            rewards = torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)
+            rewards = torch.ones(BATCH_SIZE, MAX_SEQ_LEN-1).to(DEVICE)
         else:
-            rewards = -(0.99 * torch.ones(BATCH_SIZE,MAX_SEQ_LEN-1).to(DEVICE)).log()
+            rewards = (torch.ones(BATCH_SIZE, MAX_SEQ_LEN-1).to(DEVICE)).log()
 
     # Compute word-level rewards
     elif SEQGAN:
@@ -254,9 +254,10 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
 
         _, sentence_level_rewards_real = dis.get_rewards(real_reply.to(DEVICE), PAD)
         _, sentence_level_rewards_fake = dis.get_rewards(fake_reply.long().to(DEVICE).detach(), PAD)
+
         loss_fake = torch.mean(sentence_level_rewards_fake)
-        loss_real = -torch.mean(sentence_level_rewards_real)
-        total_loss = loss_fake + loss_real
+        loss_real = torch.mean(sentence_level_rewards_real)
+        total_loss =  -1 * (loss_real - loss_fake) 
         total_loss.backward() 
         dis_opt.step()
 
@@ -322,7 +323,6 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 loss_real = torch.mean(sentence_level_rewards_real)
 
                 total_loss =  -1 * (loss_real - loss_fake) 
-                print(total_loss.item())
                 total_loss.backward()             
 
             dis_opt.step()
