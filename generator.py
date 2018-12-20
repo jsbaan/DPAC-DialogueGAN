@@ -67,7 +67,7 @@ class Generator(nn.Module):
         rewards = rewards.to(DEVICE)
         probabilities = probabilities.to(DEVICE)
         sentences_level_reward = torch.mean(rewards, 1)
-        R_s_w = torch.mul(sentences_level_reward.view(-1, 1), rewards)
+        R_s_w = rewards
 
         sent_len = rewards.size(1)
         J = 0
