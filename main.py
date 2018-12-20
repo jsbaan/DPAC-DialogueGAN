@@ -54,9 +54,9 @@ ACTOR_LR = 1e-3
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-3
 AC = False
-SEQGAN = False
+SEQGAN = True
 if SEQGAN:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final_SEQ_GAN.pth.tar"
 else:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
 
