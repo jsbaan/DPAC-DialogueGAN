@@ -17,8 +17,9 @@ class Discriminator(nn.Module):
         self.device = device
 
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False)
-        self.dropout = nn.Dropout(p=dropout)
+        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers=2, bidirectional=False, dropout=dropout)
+        self.gru2hidden = nn.Linear(2*hidden_dim, hidden_dim)
+        self.dropout_linear = nn.Dropout(p=dropout)
         self.hidden2out = nn.Linear(hidden_dim, vocab_size)
 
 
@@ -27,14 +28,14 @@ class Discriminator(nn.Module):
         return h.to(self.device)
 
     def forward(self, input, hidden):
-        embedding = self.embeddings(input.to(self.device)) # batchsize x embedding dim
-        embedding = embedding.permute(1, 0, 2)
-        out, hidden = self.gru(embedding, hidden)
-        out = out[-1,:,:] # Take the output for the last token
+        emb = self.embeddings(input)                               # batch_size x seq_len x embedding_dim
+        emb = emb.permute(1, 0, 2)                                 # seq_len x batch_size x embedding_dim
+        _, hidden = self.gru(emb, hidden)                          # 4 x batch_size x hidden_dim
+        hidden = hidden.permute(1, 0, 2).contiguous()
+        out = self.gru2hidden(hidden.view(-1, 2*self.hidden_dim))  # batch_size x 4*hidden_dim
         out = torch.tanh(out)
-        out = self.dropout(out)
-        out = self.hidden2out(out)
-        out = torch.softmax(out, dim=1)
+        out_reply = self.dropout_linear(out)
+        out = torch.softmax(self.hidden2out(out_reply), 1)
         return out.squeeze()
 
     def batchClassify(self, input):

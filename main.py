@@ -46,9 +46,9 @@ DIS_HIDDEN_DIM = 128
 
 CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = False
-PRETRAIN_DISCRIMINATOR = False
-POLICY_GRADIENT = True
-ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
+PRETRAIN_DISCRIMINATOR = True
+POLICY_GRADIENT = False
+ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
@@ -58,7 +58,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = None#"discriminator_final_LM.pth.tar"
 
 
 
@@ -88,14 +88,14 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
     else:
         # Compute word-level rewards
-        rewards = dis.get_rewards(fake_reply, PAD)
+        rewards = dis.get_rewards(fake_reply, PAD).detach()
 
     # Compute perplexity
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute REINFORCE loss with the assumption that G = R_t
-    pg_loss = gen.compute_reinforce_loss(rewards, word_probabilities)
+    pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities)
 
     # Backward pass
     gen_opt.zero_grad()
@@ -127,6 +127,7 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
     """
     # Run input through encoder
     encoder_output, hidden = gen.encoder(context)
+
     hidden = hidden[:gen.decoder.n_layers]
     input = torch.autograd.Variable(context.data[0, :])  # sos
     samples = torch.autograd.Variable(PAD*torch.ones(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
@@ -249,10 +250,10 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
 
         with torch.no_grad():
             fake_reply, _,_= gen.sample(context, real_reply)
-        fake_reply = fill_with_padding(fake_reply, EOU, PAD)
+        fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
 
         real_r = dis.get_rewards(real_reply.to(DEVICE), PAD)
-        fake_r = dis.get_rewards(fake_reply.to(DEVICE), PAD)
+        fake_r = dis.get_rewards(fake_reply.to(DEVICE).detach(), PAD)
 
         real_rewards = calc_mean(real_r)
         fake_rewards = calc_mean(fake_r)
@@ -470,7 +471,7 @@ if __name__ == '__main__':
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
                 print('Iteration {}'.format(n))
-                perform_evaluation(evaluator, actor)
+                # perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
