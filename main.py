@@ -384,7 +384,7 @@ def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
     print("Models and Optimizers saved")
 
 def load_models():
-    prefix = 'adversial_checpoint'
+    prefix = 'adversial_checkpoint'
     postfix = '.pth.tar'
     files = [f for f in os.listdir('.') if os.path.isfile(f)]
     files = [f for f in files if f.startswith(prefix) and f.endswith(postfix)]
@@ -399,7 +399,7 @@ def load_models():
     nums = sorted(nums)
     if len(nums) > 2:
         file = prefix + str(nums[-2]) + postfix
-        data = torch.load(file)
+        data = torch.load(file, map_location=DEVICE)
 
         return data
 
@@ -486,9 +486,9 @@ if __name__ == '__main__':
         if saved_data is not None:
             start_epoch = saved_data['epoch']
             actor.load_state_dict(saved_data['actor'])
-            PG_optimizer.load_state_dict(data['act_optimizer'])
-            dis_optimizer.load_state_dict(data['dis_optimizer'])
-            discriminator.load_state_dict(data['discriminator'])
+            PG_optimizer.load_state_dict(saved_data['act_optimizer'])
+            dis_optimizer.load_state_dict(saved_data['dis_optimizer'])
+            discriminator.load_state_dict(saved_data['discriminator'])
 
         # Adversarial training loop
         gen_data_loader = iter(load_data())
@@ -498,7 +498,7 @@ if __name__ == '__main__':
         N = ADV_TRAIN_EPOCHS * num_batches
         M = 1
         K = 5
-        for n in range(N):
+        for n in range(start_epoch, N):
             if n % num_batches == 0 and n > 0:
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
