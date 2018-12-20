@@ -321,8 +321,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 loss_total.backward()
                 losses.append(loss_total.item())
             else:
-                rewards_real, sentence_level_rewards_real = dis.get_rewards(real_reply, PAD)
-                rewards, sentence_level_rewards_fake = dis.get_rewards(fake_reply.long(), PAD)
+                rewards_real, sentence_level_rewards_real = dis.get_rewards(real_reply.to(DEVICE), PAD)
+                rewards, sentence_level_rewards_fake = dis.get_rewards(fake_reply.long().to(DEVICE), PAD)
                 real_list.append(torch.mean(sentence_level_rewards_real).item())
                 fake_list.append(torch.mean(sentence_level_rewards_fake).item())
                 loss_fake = torch.mean(sentence_level_rewards_fake)
