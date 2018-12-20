@@ -9,6 +9,8 @@ import sys
 import time
 from torch.nn.utils import clip_grad_norm_
 import numpy as np
+from evaluation.Evaluator import Evaluator
+
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda:0')
 else:
@@ -131,6 +133,8 @@ class Generator(nn.Module):
         #     self.load_state_dict(saved_data['state_dict'])
         #     optimizer.load_state_dict(saved_data['optimizer'])
 
+        evaluator = Evaluator(vocab_size=8000, min_seq_len=5, max_seq_len=20, batch_size=256, device=DEVICE)
+
         loss_per_epoch = []
         for epoch in range(start_epoch, epochs):
             print('epoch %d : ' % (epoch + 1))
@@ -176,6 +180,9 @@ class Generator(nn.Module):
                         print("Unable to print")
 
             loss_per_epoch.append(total_loss)
+
+            metrics = evaluator.evaluate(self, distinct=True)
+            print(metrics)
         torch.save(loss_per_epoch, "generator_final_loss.pth.tar")
         return losses
 

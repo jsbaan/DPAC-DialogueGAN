@@ -47,7 +47,7 @@ CAPACITY_RM = 100000
 PRETRAIN_GENERATOR = True
 PRETRAIN_DISCRIMINATOR = False
 POLICY_GRADIENT = False
-ACTOR_CHECKPOINT = "generator_checkpoint79.pth.tar"
+ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
 GEN_MLE_LR = 1e-3
 DISCRIMINATOR_MLE_LR = 1e-2
 ACTOR_LR = 1e-2
@@ -349,6 +349,9 @@ if __name__ == '__main__':
     if PRETRAIN_GENERATOR:
         print('Starting Generator MLE Training...')
         gen = Generator(SOS,EOU,VOCAB_SIZE, GEN_HIDDEN_DIM, GEN_EMBEDDING_DIM, MAX_SEQ_LEN).to(DEVICE)
+        saved_gen = torch.load(ACTOR_CHECKPOINT, map_location=DEVICE)
+        gen.load_state_dict(saved_gen['state_dict'])
+
         genMLE_optimizer = optim.Adam(gen.parameters(), lr = GEN_MLE_LR)
         gen.train_generator_MLE(genMLE_optimizer, train_data_loader, MLE_TRAIN_EPOCHS, DEVICE)
 
