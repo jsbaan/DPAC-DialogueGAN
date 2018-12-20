@@ -86,7 +86,7 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
     else:
         # Compute word-level rewards
-        rewards, sentence_level_rewards = dis.get_rewards(fake_reply, PAD).detach()
+        rewards, sentence_level_rewards = dis.get_rewards(fake_reply.to(DEVICE), PAD).detach()
 
     # Compute perplexity
     entropy = torch.mean(word_probabilities.log(), dim=1)
