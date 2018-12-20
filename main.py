@@ -86,14 +86,14 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
         rewards = gen.monte_carlo(dis, context, fake_reply, hiddens, num_samples, corpus).detach()
     else:
         # Compute word-level rewards
-        rewards, sentence_level_rewards = dis.get_rewards(fake_reply.long().to(DEVICE), PAD).detach()
+        rewards, sentence_level_rewards = dis.get_rewards(fake_reply.long().to(DEVICE), PAD)
 
     # Compute perplexity
     entropy = torch.mean(word_probabilities.log(), dim=1)
     perplexity = torch.mean(2**(-entropy)).item()
 
     # Compute REINFORCE loss with the assumption that G = R_t
-    pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities, sent_rewards=sentence_level_rewards)
+    pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities, sent_rewards=sentence_level_rewards.detach())
 
     # Backward pass
     gen_opt.zero_grad()
