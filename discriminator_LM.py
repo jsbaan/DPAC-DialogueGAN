@@ -50,7 +50,7 @@ class Discriminator(nn.Module):
         """
 
         h_response = self.init_hidden(input.size()[0]).to(self.device)
-        output = self.forward(input.long().to(self.device), h_response).
+        output = self.forward(input.long().to(self.device), h_response)
         return output
 
     def batchBCELoss(self, inp, target):
