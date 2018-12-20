@@ -87,7 +87,7 @@ class Discriminator(nn.Module):
                     break
 
             # rewards[:, t] = -criterion(output, target.long().to(self.device))
-            rewards[:, t] = torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)
+            rewards[:, t] = -torch.log(reward.squeeze() + 0.0001) * mask.to(self.device)
         return rewards
 
     def get_reward(self, history, word):
@@ -96,5 +96,5 @@ class Discriminator(nn.Module):
         """
         output = self.batchClassify(history.long())
         reward = output.gather(1, word.type(torch.LongTensor).unsqueeze(1).to(self.device))
-        reward = torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
+        reward = -torch.log(reward.squeeze() + 0.0001) # prevent taking the log of zero
         return reward
