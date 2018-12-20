@@ -37,7 +37,7 @@ MAX_SEQ_LEN = 20
 BATCH_SIZE = 64
 MLE_TRAIN_EPOCHS = 100
 ADV_TRAIN_EPOCHS = 50
-DIS_TRAIN_EPOCHS = 3
+DIS_TRAIN_EPOCHS = 2
 
 GEN_EMBEDDING_DIM = 256
 GEN_HIDDEN_DIM = 256
@@ -49,7 +49,7 @@ PRETRAIN_GENERATOR = False
 PRETRAIN_DISCRIMINATOR = True
 POLICY_GRADIENT = False
 ACTOR_CHECKPOINT = "generator_checkpoint19.pth.tar"
-DISCRIMINATOR_MLE_LR = 1e-2
+DISCRIMINATOR_MLE_LR = 5e-2
 ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
@@ -270,12 +270,6 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
 
     start_epoch = 0
-    # saved_dis = try_get_state_dicts(prefix='discriminator_checkpoint')
-    # if saved_dis is not None:
-    #     start_epoch = saved_dis['epoch']
-    #     discriminator.load_state_dict(saved_dis['state_dict'])
-    #     dis_opt.load_state_dict(saved_dis['optimizer'])
-
     loss_per_epoch = []
     losses = []
     real_list = []
@@ -320,12 +314,17 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
             else:
                 rewards_real, sentence_level_rewards_real = dis.get_rewards(real_reply.to(DEVICE), PAD)
                 rewards, sentence_level_rewards_fake = dis.get_rewards(fake_reply.long().to(DEVICE), PAD)
+
                 real_list.append(torch.mean(sentence_level_rewards_real).item())
                 fake_list.append(torch.mean(sentence_level_rewards_fake).item())
+
                 loss_fake = torch.mean(sentence_level_rewards_fake)
-                loss_real = -torch.mean(sentence_level_rewards_real)
-                total_loss = loss_fake + loss_real
-                total_loss.backward()                
+                loss_real = torch.mean(sentence_level_rewards_real)
+
+                total_loss =  -1 * (loss_real - loss_fake) 
+                print(total_loss.item())
+                total_loss.backward()             
+
             dis_opt.step()
 
 
