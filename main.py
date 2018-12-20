@@ -74,8 +74,6 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
 
     # Forward pass
     fake_reply, word_probabilities, hiddens = gen.sample(context, reply, TF=TF)
-    fake_reply = fill_with_padding(fake_reply, EOU, PAD).detach()
-
 
     if TF==1:
         if SEQGAN:
