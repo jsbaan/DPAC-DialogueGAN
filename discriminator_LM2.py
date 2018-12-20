@@ -42,6 +42,10 @@ class LM(nn.Module):
     probabilities, _ = self.forward(reply.long())
     rewards = torch.zeros(self.batch_size, self.num_steps - 1)
     indices = torch.arange(self.batch_size).long()
+    if torch.cuda.is_available():
+      indices = indices.cuda()
+      rewards = rewards.cuda()
+
     for t in range(self.num_steps - 1):
       rewards[indices, t] = probabilities[indices, t, reply[:, t+1].view(-1)].view(-1)
     padding_matrix = (reply != PAD).float()
