@@ -58,7 +58,7 @@ SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
 else:
-    DISCRIMINATOR_CHECKPOINT = None#"discriminator_final_LM.pth.tar"
+    DISCRIMINATOR_CHECKPOINT = "discriminator_final_LM.pth.tar"
 
 
 
