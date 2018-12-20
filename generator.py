@@ -70,7 +70,7 @@ class Generator(nn.Module):
             sentence_level_reward = torch.mean(rewards, 1).unsqueeze(1)
         else:
             sentence_level_reward = sent_rewards.view(-1)
-        R_s_w = torch.mul(rewards, sentence_level_reward)
+        R_s_w = rewards
 
         sent_len = rewards.size(1)
         J = 0
