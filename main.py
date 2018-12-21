@@ -163,7 +163,7 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
         if memory.__len__() > AC_WARMUP:
             # Retrieve batch from replay memory
             info = tuple(zip(*memory.sample(BATCH_SIZE)))
-            state, action, log_p, reward, next_state, done = [torch.stack(i) for i in info]
+            state, action, log_p, reward, next_state, done = [torch.stack(i).to(DEVICE) for i in info]
 
             # Estimate state-action values for each state in batch using critic
             q_values = critic.forward(state.long())[np.arange(BATCH_SIZE), action]
