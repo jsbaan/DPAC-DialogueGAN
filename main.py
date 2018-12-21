@@ -463,7 +463,7 @@ if __name__ == '__main__':
         gen_data_loader = iter(load_data())
         gen_data_loader_tf = iter(load_data())
         dis_data_loader = iter(load_data())
-        num_batches = len(gen_data_loader)
+        num_batches = int(len(gen_data_loader)/2)
         N = ADV_TRAIN_EPOCHS * num_batches
         M = 1
         K = 5
@@ -471,7 +471,7 @@ if __name__ == '__main__':
             if n % num_batches == 0:
                 print('Iteration {}'.format(n))
                 perform_evaluation(evaluator, actor)
-                
+
             if n % num_batches == 0 and n > 0:
                 if AC:
                     save_models(actor, discriminator, n, AC_optimizer, dis_optimizer)
