@@ -176,12 +176,13 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
 
             # Compute combined actor critic loss and backprop
             actor_loss = -torch.mean(q_values)
-            critic_loss = F.smooth_l1_loss(q_values, q_values_target)
+            critic_loss = torch.nn.functional.smooth_l1_loss(q_values, q_values_target)
             loss = actor_loss + critic_loss
             AC_optimizer.zero_grad()
             loss.backward()
             AC_optimizer.step()
-    return loss
+            return loss
+    return None
 
 
 def fill_with_padding(sentences, u_token, pad_token):
@@ -484,6 +485,15 @@ if __name__ == '__main__':
                 if AC:
                     perplexity = train_generator_PGAC(context.to(DEVICE), reply.to(DEVICE),\
                         actor, discriminator, memory, critic, AC_optimizer,EOU,PAD)
+
+                    # Teacher forcing
+                    try:
+                        context, reply = gen_data_loader_tf.next()
+                    except:
+                        gen_data_loader_tf = iter(load_data())
+                    perplexity = train_generator_PG(context.to(DEVICE), reply.to(DEVICE), \
+                        actor, AC_optimizer, discriminator, num_samples=NUM_SAMPLES,TF=1)
+
                 # PG step
                 else:
                     perplexity = train_generator_PG(context.to(DEVICE), reply.to(DEVICE),\
