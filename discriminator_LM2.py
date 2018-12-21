@@ -45,3 +45,10 @@ class LM(nn.Module):
     sentence_level_reward = torch.sum(rewards, 1)/padding_matrix_sum
     return rewards, sentence_level_reward
 
+    def get_reward(self, state, action):
+      reply = reply.long().to(self.device)
+      indices = torch.arange(reply.size(0)).to(self.device)
+      prediction = self.forward(reply)
+      reward = torch.log(prediction[indices, label.view(-1)] + 1e-6)
+      return reward
+
