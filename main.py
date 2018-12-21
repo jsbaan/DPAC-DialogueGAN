@@ -468,14 +468,15 @@ if __name__ == '__main__':
         M = 1
         K = 5
         for n in range(N):
+            if n % num_batches == 0:
+                print('Iteration {}'.format(n))
+                perform_evaluation(evaluator, actor)
+                
             if n % num_batches == 0 and n > 0:
                 if AC:
                     save_models(actor, discriminator, n, AC_optimizer, dis_optimizer)
                 else:
                     save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
-            if n % num_batches == 0:
-                print('Iteration {}'.format(n))
-                perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
