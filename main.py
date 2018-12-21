@@ -163,19 +163,19 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
         if memory.__len__() > AC_WARMUP:
             # Retrieve batch from replay memory
             info = tuple(zip(*memory.sample(BATCH_SIZE)))
-            state, action, log_p, reward, next_state, done = [torch.stack(i) for i in info]
+            state, action, log_p, reward, next_state, done = [torch.stack(i).to(DEVICE) for i in info]
 
             # Estimate state-action values for each state in batch using critic
-            q_values = critic.forward(state.to(DEVICE).long())[np.arange(BATCH_SIZE), action]
+            q_values = critic.forward(state.long())[torch.arange(BATCH_SIZE).to(DEVICE), action]
             with torch.no_grad():
                 mask = (done==False).float()
                 q_values_target = mask.float()*(DISCOUNT_FACTOR * \
-                    torch.max(critic.forward(next_state.to(DEVICE).long()), dim=1)[0].float()) \
+                    torch.max(critic.forward(next_state.long()), dim=1)[0].float()) \
                     + reward
 
             # Compute combined actor critic loss and backprop
             actor_loss = -torch.mean(q_values)
-            critic_loss = torch.nn.functional.smooth_l1_loss(q_values.to(DEVICE), q_values_target.to(DEVICE))
+            critic_loss = torch.nn.functional.smooth_l1_loss(q_values, q_values_target)
             loss = actor_loss + critic_loss
             AC_optimizer.zero_grad()
             loss.backward()
