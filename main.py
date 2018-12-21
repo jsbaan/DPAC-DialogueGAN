@@ -95,8 +95,6 @@ def train_generator_PG(context, reply, gen, gen_opt, dis, num_samples=0, TF=0):
     # Compute REINFORCE loss with the assumption that G = R_t
     pg_loss = gen.compute_reinforce_loss(rewards.detach(), word_probabilities)
 
-
-
     # Backward pass
     gen_opt.zero_grad()
     pg_loss.backward()
@@ -149,14 +147,15 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
 
         # Check which episodes (sampled sentences) have not encountered a EOU token
         done = (action == EOU).float()
-        active_index = active_ep_idx.nonzero().squeeze(1)
+        if active_ep_idx.nonzero().numel() > 1:
+            active_index = active_ep_idx.nonzero().squeeze(1)
 
-        # Only put states of active episodes in replay memory
-        old_state = samples.clone()
-        reward = dis.get_reward(samples[active_index,:t], action[active_index])
-        samples[:, t] = action
-        done_index = done.nonzero()
-        active_ep_idx[done_index] = 0
+            # Only put states of active episodes in replay memory
+            old_state = samples.clone()
+            reward = dis.get_reward(samples[active_index,:t], action[active_index])
+            samples[:, t] = action
+            done_index = done.nonzero()
+            active_ep_idx[done_index] = 0
 
         for j,i in enumerate(active_index):
             memory.push((old_state[i,:], action[i], log_p[i], reward[j], samples[i,:], done[i]))
@@ -473,7 +472,7 @@ if __name__ == '__main__':
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
                 print('Iteration {}'.format(n))
-                perform_evaluation(evaluator, actor)
+                # perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
