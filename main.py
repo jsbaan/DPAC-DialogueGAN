@@ -449,7 +449,7 @@ if __name__ == '__main__':
 
         # Define critic and dual optimizer
         if AC:
-            critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE)
+            critic = critic.Critic(DIS_EMBEDDING_DIM, DIS_HIDDEN_DIM, VOCAB_SIZE, MAX_SEQ_LEN, device=DEVICE).to(DEVICE)
             AC_optimizer = optim.Adagrad([
                 {'params': actor.parameters(), 'lr': ACTOR_LR},
                 {'params': critic.parameters(), 'lr': CRITIC_LR}
