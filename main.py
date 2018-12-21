@@ -53,7 +53,7 @@ DISCRIMINATOR_MLE_LR = 5e-2
 ACTOR_LR = 1e-2
 CRITIC_LR = 1e-2
 DISCRIMINATOR_LR = 1e-2
-AC = False
+AC = True
 SEQGAN = False
 if SEQGAN:
     DISCRIMINATOR_CHECKPOINT = "discriminator_final.pth.tar"
@@ -127,21 +127,22 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
     """
     # Run input through encoder
     encoder_output, hidden = gen.encoder(context)
-
-    hidden = hidden[:gen.decoder.n_layers]
-    input = torch.autograd.Variable(context.data[0, :])  # sos
+    hidden = gen.decoder._init_state(hidden)
+    input = torch.autograd.Variable(context.data[:, 0])  # sos
     samples = torch.autograd.Variable(PAD*torch.ones(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
     samples[:,0] = input
     active_ep_idx = torch.ones(BATCH_SIZE)
     EOU = torch.tensor(EOU).repeat(BATCH_SIZE)
+    function = torch.nn.functional.log_softmax
 
     # Pass through decoder and sample action (word) from resulting vocab distribution
     for t in range(1, MAX_SEQ_LEN):
-        output, hidden, attn_weights = gen.decoder(
-                input, hidden, encoder_output)
+        output, hidden, attn_weights = gen.decoder.forward_step(
+                input.unsqueeze(1), hidden, encoder_output, function)
 
         # Sample action (token) for entire batch from predicted vocab distribution
         # and set input for next forward pass
+        output = output.squeeze(1)
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
         log_p = output.gather(1, action.unsqueeze(1)).view(-1).data
         input = torch.autograd.Variable(action)
@@ -173,7 +174,6 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
                     torch.max(critic.forward(next_state.long()), dim=1)[0].float()) \
                     + reward
 
-            # TODO add rho importance sampling
             # Compute combined actor critic loss and backprop
             actor_loss = -torch.mean(q_values)
             critic_loss = F.smooth_l1_loss(q_values, q_values_target)
@@ -257,12 +257,9 @@ def train_discriminator(context,real_reply,gen, dis, dis_opt):
 
         loss_fake = torch.mean(sentence_level_rewards_fake)
         loss_real = torch.mean(sentence_level_rewards_real)
-        total_loss =  -1 * (loss_real - loss_fake) 
-        total_loss.backward() 
+        total_loss =  -1 * (loss_real - loss_fake)
+        total_loss.backward()
         dis_opt.step()
-
-
-
 
 def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
     """
@@ -322,8 +319,8 @@ def pre_train_discriminator(dis, dis_opt, gen, corpus, epochs):
                 loss_fake = torch.mean(sentence_level_rewards_fake)
                 loss_real = torch.mean(sentence_level_rewards_real)
 
-                total_loss =  -1 * (loss_real - loss_fake) 
-                total_loss.backward()             
+                total_loss =  -1 * (loss_real - loss_fake)
+                total_loss.backward()
 
             dis_opt.step()
 
@@ -387,7 +384,6 @@ def save_models(actor, discriminator, epoch, PG_optimizer, dis_optimizer):
                         'discriminator': discriminator.state_dict()
                     },'adversial_checkpoint{}.pth.tar'.format(epoch))
     print("Models and Optimizers saved")
-
 
 def perform_evaluation(evaluator, actor):
     actor = actor.eval()
@@ -476,7 +472,7 @@ if __name__ == '__main__':
                 save_models(actor, discriminator, n, PG_optimizer, dis_optimizer)
             if n % num_batches == 0:
                 print('Iteration {}'.format(n))
-                perform_evaluation(evaluator, actor)
+                # perform_evaluation(evaluator, actor)
 
             # TRAIN GENERATOR (ACTOR)
             for m in range(M):
