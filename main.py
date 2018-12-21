@@ -131,8 +131,8 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
     input = torch.autograd.Variable(context.data[:, 0])  # sos
     samples = torch.autograd.Variable(PAD*torch.ones(BATCH_SIZE,MAX_SEQ_LEN)).to(DEVICE)
     samples[:,0] = input
-    active_ep_idx = torch.ones(BATCH_SIZE)
-    EOU = torch.tensor(EOU).repeat(BATCH_SIZE)
+    active_ep_idx = torch.ones(BATCH_SIZE).to(DEVICE)
+    EOU = torch.tensor(EOU).repeat(BATCH_SIZE).to(DEVICE)
     function = torch.nn.functional.log_softmax
 
     # Pass through decoder and sample action (word) from resulting vocab distribution
@@ -145,7 +145,7 @@ def train_generator_PGAC(context, reply, gen, dis, memory, critic, AC_optimizer,
         output = output.squeeze(1)
         action = torch.multinomial(torch.exp(output), 1).view(-1).data
         log_p = output.gather(1, action.unsqueeze(1)).view(-1).data
-        input = torch.autograd.Variable(action)
+        input = torch.autograd.Variable(action).to(DEVICE)
 
         # Check which episodes (sampled sentences) have not encountered a EOU token
         done = (action == EOU).float()
